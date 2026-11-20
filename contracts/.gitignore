@@ -1,0 +1,17 @@
+# Foundry
+out/
+cache/
+broadcast/
+!broadcast/**/dry-run/
+docs/
+
+# Dependencies
+lib/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Coverage
+lcov.info
