@@ -1,6 +1,7 @@
 {
-  "name": "Your Brand",
-  "short_name": "Brand",
+  "name": "Skyline — Curator Exit Parity",
+  "short_name": "Skyline",
+  "description": "Hook-enforced exit alignment for Uniswap v4 curated liquidity.",
   "start_url": "/",
   "icons": [],
   "theme_color": "#0f2420",

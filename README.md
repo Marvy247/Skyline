@@ -9,9 +9,10 @@
 
 ## 0. Read this first (operating protocol for an AI agent)
 
-This repository is a **specification, not an implementation**. It exists so that you — or any
-AI agent picking this up cold — can build Skyline correctly, in order, without re-deriving
-the research and without making the architectural mistakes this project is designed to avoid.
+This repository contains **both the specification and a working implementation**. The docs exist
+so that you — or any AI agent picking it up cold — can understand Skyline correctly, in order,
+without re-deriving the research and without repeating the architectural mistakes this project is
+designed to avoid.
 
 ### 0.1 Order of operations
 

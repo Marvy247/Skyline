@@ -12,7 +12,7 @@
 
 - [ ] Every `TODO` filled
 - [ ] Demo video link added (or placeholder committed to by 30 Nov)
-- [ ] Repo link added (public or private-with-access)
+- [x] Repo link added — https://github.com/Marvy247/Skyline
 - [ ] Deployed contract addresses on testnet added
 - [ ] Theme-mapping table matches `01-PROJECT-BRIEF.md` §6
 - [ ] The "why a hook" paragraph survives the "so what, it's just a vault" objection
@@ -227,7 +227,7 @@ manager's capital to the people whose capital they manage.
 | Track / theme | Active Management and Curation |
 | Category | Liquidity management / risk alignment |
 | Integrations | Uniswap v4 (PoolManager, Hooks, StateLibrary), Chainlink (Price Feeds + Automation), Foundry |
-| Repo | `TODO` — publish before 30 November |
+| Repo | **https://github.com/Marvy247/Skyline** |
 | Demo video | `TODO` — 90-second clip, before 30 November |
 | Deployed addresses | `TODO` — Base Sepolia (84532); deploy script and artifact schema are ready |
 | Team | `TODO` |

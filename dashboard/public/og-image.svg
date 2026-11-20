@@ -1,73 +1,45 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <!-- Dark background -->
-  <rect width="1200" height="630" fill="#0f172a"/>
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0b1220" />
 
-  <!-- Subtle grid pattern -->
+  <!-- Grid -->
   <defs>
     <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-      <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#10b98110" stroke-width="1"/>
+      <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#10b981" stroke-opacity="0.10" stroke-width="1" />
     </pattern>
-    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#10b981" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
-    </radialGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0.05" />
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#fb923c" />
+    </linearGradient>
+    <linearGradient id="title" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#7dd3fc" />
+    </linearGradient>
   </defs>
-  <rect width="1200" height="630" fill="url(#grid)"/>
 
-  <!-- Central glow -->
-  <ellipse cx="600" cy="315" rx="500" ry="300" fill="url(#glow)"/>
+  <rect width="1200" height="630" fill="url(#grid)" />
+  <circle cx="980" cy="150" r="320" fill="url(#glow)" />
 
-  <!-- Top-left accent line -->
-  <line x1="0" y1="0" x2="200" y2="0" stroke="#10b981" stroke-width="3" opacity="0.6"/>
-  <line x1="0" y1="0" x2="0" y2="120" stroke="#10b981" stroke-width="3" opacity="0.6"/>
-  <!-- Bottom-right accent line -->
-  <line x1="1200" y1="630" x2="1000" y2="630" stroke="#10b981" stroke-width="3" opacity="0.6"/>
-  <line x1="1200" y1="630" x2="1200" y2="510" stroke="#10b981" stroke-width="3" opacity="0.6"/>
-
-  <!-- Logo mark — simplified chain link icon -->
-  <g transform="translate(488, 200)">
-    <!-- Left link -->
-    <rect x="0" y="20" width="52" height="26" rx="13" fill="none" stroke="#10b981" stroke-width="5"/>
-    <!-- Right link -->
-    <rect x="72" y="20" width="52" height="26" rx="13" fill="none" stroke="#10b981" stroke-width="5"/>
-    <!-- Connector -->
-    <rect x="38" y="28" width="48" height="10" rx="5" fill="#10b981"/>
+  <!-- Mark: depositor capital dominant, curator bond subordinate -->
+  <g transform="translate(110 92)">
+    <rect width="112" height="112" rx="28" fill="#0c4a6e" />
+    <circle cx="56" cy="56" r="34" stroke="url(#ring)" stroke-width="9" fill="none" stroke-opacity="0.95" />
+    <circle cx="56" cy="56" r="18" fill="#ffffff" fill-opacity="0.94" />
+    <path d="M56 15 L56 29" stroke="#ffffff" stroke-width="9" stroke-linecap="round" />
   </g>
 
-  <!-- FlowLink wordmark -->
-  <text
-    x="600"
-    y="305"
-    font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"
-    font-size="88"
-    font-weight="800"
-    fill="#f8fafc"
-    text-anchor="middle"
-    letter-spacing="-3"
-  >Flow<tspan fill="#10b981">Link</tspan></text>
+  <!-- Copy -->
+  <text x="110" y="292" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="86" font-weight="800" letter-spacing="-2" fill="url(#title)">SKYLINE</text>
+  <text x="112" y="356" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="34" font-weight="600" fill="#cbd5e1">Curator Exit Parity for Uniswap v4</text>
+  <text x="112" y="448" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="52" font-weight="700" fill="#ffffff">The curator cannot run.</text>
+  <text x="112" y="505" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="26" font-weight="400" fill="#94a3b8">Bonded curator capital. Hook-enforced exit priority. Loss absorption.</text>
 
-  <!-- Tagline -->
-  <text
-    x="600"
-    y="360"
-    font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"
-    font-size="24"
-    font-weight="400"
-    fill="#94a3b8"
-    text-anchor="middle"
-    letter-spacing="0.5"
-  >Crypto Payments with Built-in Compliance Tools</text>
-
-  <!-- Bottom badge -->
-  <rect x="490" y="420" width="220" height="38" rx="19" fill="#10b98115" stroke="#10b98140" stroke-width="1"/>
-  <circle cx="515" cy="439" r="5" fill="#10b981"/>
-  <text
-    x="600"
-    y="445"
-    font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"
-    font-size="15"
-    font-weight="500"
-    fill="#10b981"
-    text-anchor="middle"
-  >Live on HashKey Chain</text>
+  <!-- Footer rule and labels -->
+  <rect x="112" y="556" width="976" height="1" fill="#1e293b" />
+  <text x="112" y="592" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#64748b">UHI11 · Active Management and Curation</text>
+  <text x="1088" y="592" text-anchor="end" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#64748b">Base Sepolia · Uniswap v4 · Chainlink</text>
 </svg>
