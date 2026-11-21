@@ -72,6 +72,7 @@ breaks the core thesis or opens a fund-loss bug.
 | `docs/15-PROGRESS.md` | Living status log + handover notes |
 | `docs/16-IMPLEMENTATION-NOTES.md` | **Every place the code diverged from the spec, and why** |
 | `templates/` | Contract, hook, test, invariant, spec and readiness templates |
+| `contracts/` | Foundry implementation — `bootstrap.sh` installs the pinned dependencies |
 | `dashboard/` | **The Next.js dashboard** — see `docs/09-FRONTEND.md` |
 
 ---
@@ -130,7 +131,7 @@ Not by policy. Not by reputation. By construction.
 
 | Component | State |
 |---|---|
-| **Contracts** | Implemented and tested — **61 tests, all green** (40 core + 21 Chainlink/keeper), plus 7 invariants (`contracts/`) |
+| **Contracts** | Implemented and tested — **61 tests, all green** (33 core unit + 21 Chainlink/keeper + 7 invariants) (`contracts/`) |
 | **Dashboard** | Complete — typechecks, builds warning-free, ABI aligned (`dashboard/`) |
 | **Deployment** | Full stack deployed and exercised on local anvil; Base Sepolia config ready, public deploy pending RPC + funded key |
 | **Chainlink** | Price-feed risk regime, Automation-compatible keeper, and 21 tests — implemented and tested; live Base Sepolia feed wiring is configured but not yet exercised |
@@ -145,8 +146,9 @@ mechanics the spec got wrong.
 # 1. The dashboard (already built)
 cd dashboard && npm install && npm run dev
 
-# 2. The contracts — already built and tested
+# 2. The contracts
 cd ../contracts
+./bootstrap.sh                                        # installs the pinned dependencies
 forge build
 forge test                                              # 61 tests, all green
 FOUNDRY_PROFILE=ci forge test --match-path "test/invariant/Cep.t.sol"   # 10,000 runs
@@ -168,16 +170,15 @@ The remaining work is **Phase 9**: deploy to a public testnet, seed the scenario
 90-second clip. See `docs/15-PROGRESS.md` §3 for the per-phase checklist and §5 for the open
 issues.
 
-A fresh clone needs the vendored dependencies restored (they are not committed):
+`contracts/lib` is not committed. A fresh clone installs the exact dependency set with:
 
 ```bash
 cd contracts
-forge install foundry-rs/forge-std@v1.17.0
-forge install OpenZeppelin/openzeppelin-contracts@v5.1.0
-forge install Uniswap/v4-core@v4.0.0
-forge install Uniswap/v4-hooks-public@e354058
+./bootstrap.sh          # pinned forge-std, OpenZeppelin, v4-core and solmate
 ```
 
-The pinned dependencies are `v4-core@v4.0.0` and `v4-hooks-public@e354058`; the hook base is
-hand-written against the released core because the published `uniswap-hooks` package targets a
-newer one and will not compile against it (`docs/16-IMPLEMENTATION-NOTES.md` §7).
+The script pins `forge-std@v1.17.0`, `OpenZeppelin@v5.1.0`, `v4-core@v4.0.0` and the solmate
+commit that v4-core pins. The hook base is hand-written against the released core; the published
+`uniswap-hooks` package targets a newer core and is not used (`docs/16-IMPLEMENTATION-NOTES.md`
+§7). This has been verified end to end from a fresh `git clone`: bootstrap, build, and all 61
+tests pass.

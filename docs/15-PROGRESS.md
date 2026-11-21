@@ -15,14 +15,14 @@
 | Field | Value |
 |---|---|
 | **Phase** | Phase 7 — Chainlink integration **DONE**; Phase 9 — deploy/demo/docs in progress |
-| **Last updated** | 20 November 2026 |
+| **Last updated** | 21 November 2026 |
 | **Idea submission deadline** | 16 November 2026 — **passed; submission status unconfirmed** |
 | **Final submission deadline** | 3 December 2026 |
 | **Demo Day** | 11 December 2026 |
-| **Contracts** | **implemented and tested** — 61 tests green, including 21 Chainlink/keeper tests and 7 invariants |
-| **Dashboard** | **complete** — typechecks, builds warning-free, ABI aligned with the shipped contracts |
+| **Contracts** | **implemented and tested** — 61 tests green (33 core unit + 21 Chainlink/keeper + 7 invariants); fresh-clone bootstrap verified |
+| **Dashboard** | **complete** — typechecks, builds warning-free, ABI aligned with the shipped contracts; visually checked in headless Chrome |
 | **Deployment** | full stack **verified on local anvil** (deploy + claim + block + settle + exit); Base Sepolia config ready, public deploy pending RPC + funded key |
-| **Blocking issues** | UHI11 sponsor list unverified; no live public deployment; demo clip not recorded |
+| **Blocking issues** | UHI11 sponsor list unverified; no live public deployment; demo clip not recorded; team/submission fields incomplete |
 
 ---
 
@@ -298,8 +298,40 @@ then `Inspect.s.sol` reports NAV `0.994607…`, risk `Normal`, `riskUpdatedAt 0`
 locally).
 
 **What is left:** a public Base Sepolia deployment (needs `BASE_SEPOLIA_RPC_URL` and a funded
-`DEPLOYER_PRIVATE_KEY`), the demo clip, the six `TODO`s in `docs/02-SUBMISSION.md`, and a visual
-pass of the dashboard.
+`DEPLOYER_PRIVATE_KEY`), the demo clip, and the team/video/address fields in
+`docs/02-SUBMISSION.md`. The dashboard has had a visual pass.
+
+---
+
+## 9. Handover notes — session of 21 November 2026
+
+**Completed:** the rename from MANDATE to Skyline, a clean public history (30 narrative commits
+plus the dependency-bootstrap follow-up), and end-to-end verification from a fresh clone.
+
+**What changed and why:**
+
+- Every contract, interface, test, script, dashboard component and documentation reference now
+  uses the Skyline name. The noun *mandate* remains deliberately: it is the protocol's
+  committed-parameter object (`SkylineTypes.Mandate`, `MandatePanel`, `use-mandate.ts`).
+- The salt preimages are now `keccak256("SKYLINE.LP_SALT.v1")` and
+  `keccak256("SKYLINE.CURATOR_SALT.v1")`. This changes position keys, so any pre-rename local
+  deployment must be redeployed; `deployments/31337.json` is the post-rename artifact.
+- `contracts/lib` remains uncommitted. `contracts/bootstrap.sh` installs the exact pinned set
+  (`forge-std@v1.17.0`, `OpenZeppelin@v5.1.0`, `v4-core@v4.0.0`, the solmate commit v4-core
+  pins). The `solmate/` remapping now points at the top-level install, not v4-core's nested copy.
+- The public repo is **https://github.com/Marvy247/Skyline**. `main` carries the 30-commit
+  narrative plus one follow-up bootstrap commit; the older `master` branch remains a local-only
+  safety snapshot.
+- `dashboard/public/og-image.svg`, `site.webmanifest` and the logo accessibility label were
+  rebranded; the landing page, overview and mandate tab were checked in headless Chrome.
+
+**Verified:** fresh `git clone` → `contracts/bootstrap.sh` → `forge build` → `forge test` gives
+**61 passed, 0 failed**, and `forge fmt --check` is clean. A local post-rename deploy produced
+hook `0x95A77536A5229112397780D980C59ce6962D4f80`, vault
+`0x5FC8d32690cc91D4c39d9d3abcBD16989F875707`, NAV `0.994607926246102359`, risk `Normal`.
+
+**What is left:** unchanged from §8 — public Base Sepolia deployment, demo clip, submission
+fields. No Base Sepolia RPC URL or funded deployer key is available in the environment.
 
 ---
 
