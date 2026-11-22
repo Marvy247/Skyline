@@ -25,13 +25,16 @@ Deploy and seed **before** Demo Day. Nothing on stage should require a deploy.
 
 | Step | Action | Result |
 |---|---|---|
-| 1 | Deploy hook, vault, registry, pool | Base Sepolia (or Unichain Sepolia) |
+| 1 | Deploy hook, vault, pool | Base Sepolia (or Unichain Sepolia) |
 | 2 | `curatorDeposit(20_000 USDC)` | `C = 20,000` liquidity units |
 | 3 | Alice `deposit(50_000 USDC)` | `D = 50,000` |
 | 4 | Bob `deposit(30_000 USDC)` | `D = 80,000` |
 | 5 | Swap to move the price −8% | Strategy degraded; NAV falls |
 | 6 | Alice `requestWithdraw(50_000 USDC)` | Claim #1 registered; `Q = 55,556` |
 | 7 | *(Optional)* push a second claim so the queue shows two entries | |
+
+These are the fixture's narrative numbers. The live Base Sepolia deployment is seeded with
+smaller amounts; §9 gives the exact live replay and the values it produces.
 
 **Verify before you walk on:**
 
@@ -173,9 +176,9 @@ Switch to **Overview**. Point at the exit ladder.
 
 **"Is this audited?"**
 > "No, it isn't audited. What we do have is a formal invariant suite with a stateful handler
-> under fuzzing, plus fork tests against a live testnet PoolManager. The central claim — a
-> curator cannot exit ahead of outstanding depositor obligations — is an asserted invariant, not a
-> sentence in a whitepaper."
+> under fuzzing, plus a full rehearsal of this exact scenario against a fork of the live Base
+> Sepolia deployment. The central claim — a curator cannot exit ahead of outstanding depositor
+> obligations — is an asserted invariant, not a sentence in a whitepaper."
 
 **"What's the business model?"**
 > "Performance fees, collected by a curator who is willing to post capital and accept the
@@ -241,6 +244,61 @@ Shot list:
 6. Landing page hero (3 s)
 
 Record at 1920×1080, no audio needed, no cursor jitter. **This is the submission's demo link.**
+
+---
+
+## 9. Live replay — Base Sepolia (actual numbers)
+
+The seeded live deployment is the proof; the fixture is the polished narrative. If you record
+the replay on a fork, the live seed stays intact for Demo Day.
+
+### 9.1 Addresses and starting state
+
+| Item | Value |
+|---|---|
+| Hook | `0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80` |
+| Vault | `0x51d200C87e05a4c3E13460E6F0D46977be2622C9` |
+| Keeper | `0x708C227792F969d62206E4d76603Aa1d1b9C5796` |
+| PoolId | `0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b` |
+| Curator / sole share holder | `0x27A2dD1823D883935c9824fbaC0a018cE8e891E5` |
+
+Starting state: `totalAssets` `3,951,074` (3.951074 USDC), `totalSupply` `4,030,216`, NAV
+`0.980362839113337845`, `pendingLiquidity` `0`, depositor liquidity `182,896,908,595`, curator
+liquidity `46,354,030,478`. The testnet seed uses one key for both roles for funding convenience;
+the contracts still hold the depositor and curator capital in separate v4 positions, and the
+hook does not care who owns the shares.
+
+### 9.2 Replay on a fork (leaves the live seed untouched)
+
+```bash
+# Terminal 1
+anvil --fork-url "$BASE_SEPOLIA_RPC_URL" --chain-id 84532 --port 8546 --auto-impersonate
+
+# Terminal 2 — use the same cast commands against http://127.0.0.1:8546
+V=0x51d200C87e05a4c3E13460E6F0D46977be2622C9
+H=0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80
+P=0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b
+D=0x27A2dD1823D883935c9824fbaC0a018cE8e891E5
+R=http://127.0.0.1:8546
+```
+
+| Step | Command | Expected |
+|---|---|---|
+| 1 | `cast send $V 'requestWithdraw(uint256)' 500000 --from $D --unlocked --rpc-url $R` | claim 0; `pendingLiquidity` `22,690,688,424`; `isCuratorExitBlocked` `true` |
+| 2 | `cast send $V 'requestCuratorExit()' --from $D --unlocked --rpc-url $R` | revert `CuratorExitBlocked(22690688424)` |
+| 3 | `cast send $V 'settleClaims(uint256)' 10 --from $D --unlocked --rpc-url $R` | claim settled; pending `0`; blocked `false` |
+| 4 | `cast send $V 'requestCuratorExit()' --from $D --unlocked --rpc-url $R` | approved |
+| 5 | `cast send $V 'curatorExit(uint128)' 46354030478 --from $D --unlocked --rpc-url $R` | curator liquidity `0`; proceeds `998,040` (0.99804 USDC) |
+
+Step 2 is the shot. The error selector is `0xb2f9ec04` (`CuratorExitBlocked(int128)`) and the
+argument is the outstanding obligation — the hook's own ledger, not the vault's opinion.
+
+### 9.3 If you record against the live deployment
+
+Do **not** run step 5 on the live deployment before Demo Day: it consumes the seeded curator
+bond. For the 90-second clip, stop after step 3, or run the whole sequence on the fork and show
+the live dashboard only for the current state. The decoded-revert interaction can also be shown
+from `?scenario=blocked`, which is the same component tree with the fixture's numbers.
 
 ---
 
