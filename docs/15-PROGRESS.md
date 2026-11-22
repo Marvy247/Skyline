@@ -22,7 +22,7 @@
 | **Contracts** | **implemented and tested** — 61 tests green (33 core unit + 21 Chainlink/keeper + 7 invariants); fresh-clone bootstrap verified |
 | **Dashboard** | **complete** — typechecks, builds warning-free, ABI aligned; live Base Sepolia reads verified against the deployment |
 | **Deployment** | **live on Base Sepolia (84532)** — canonical v4 PoolManager, real USDC/WETH, live Chainlink ETH/USD feed; `riskState` `Normal`, `effectiveRiskState` degrades to `Restricted` if the keeper evaluation is more than 1h old, by design; keeper `performUpkeep` exercised on-chain |
-| **Blocking issues** | UHI11 sponsor list unverified; demo clip not recorded; `Team` field incomplete |
+| **Blocking issues** | UHI11 sponsor list unverified; demo clip not recorded |
 
 ---
 
@@ -424,9 +424,10 @@ state: `pendingLiquidity` `0`, curator liquidity `46,354,030,478`, and `riskStat
 
 ### 10.6 What is left
 
-Record the 90-second clip (`docs/11-DEMO.md`), fill the `Team` field, and optionally verify the
-contracts on BaseScan (needs `BASESCAN_API_KEY`) or add a fork test. The UHI11 sponsor/prize
-breakdown is still unconfirmed.
+Record the 90-second clip (`docs/11-DEMO.md`) and fill the video link in
+`docs/02-SUBMISSION.md`. The `Team` field is **Marvy247**. Optionally verify the contracts on
+BaseScan (needs `BASESCAN_API_KEY`) or add a fork test. The UHI11 sponsor/prize breakdown is
+still unconfirmed.
 
 ---
 

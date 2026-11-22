@@ -251,7 +251,7 @@ The curator exit gate is closed only by the obligation ledger, and the keeper's
 | Repo | **https://github.com/Marvy247/Skyline** |
 | Demo video | `TODO` — 90-second clip, before 30 November |
 | Deployed addresses | **Base Sepolia (84532)** — Hook `0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80` · Vault `0x51d200C87e05a4c3E13460E6F0D46977be2622C9` · PoolId `0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b` |
-| Team | `TODO` |
+| Team | **Marvy247** |
 | Track priority | Uniswap Prize (title sponsor) + Chainlink Prize + General Prize |
 
 ---
