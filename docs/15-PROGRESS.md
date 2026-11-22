@@ -14,15 +14,15 @@
 
 | Field | Value |
 |---|---|
-| **Phase** | Phase 7 — Chainlink integration **DONE**; Phase 9 — deploy/demo/docs in progress |
-| **Last updated** | 21 November 2026 |
+| **Phase** | Phase 9 — live Base Sepolia deployment **DONE**; demo clip/submission fields in progress |
+| **Last updated** | 22 November 2026 |
 | **Idea submission deadline** | 16 November 2026 — **passed; submission status unconfirmed** |
 | **Final submission deadline** | 3 December 2026 |
 | **Demo Day** | 11 December 2026 |
 | **Contracts** | **implemented and tested** — 61 tests green (33 core unit + 21 Chainlink/keeper + 7 invariants); fresh-clone bootstrap verified |
-| **Dashboard** | **complete** — typechecks, builds warning-free, ABI aligned with the shipped contracts; visually checked in headless Chrome |
-| **Deployment** | full stack **verified on local anvil** (deploy + claim + block + settle + exit); Base Sepolia config ready, public deploy pending RPC + funded key |
-| **Blocking issues** | UHI11 sponsor list unverified; no live public deployment; demo clip not recorded; team/submission fields incomplete |
+| **Dashboard** | **complete** — typechecks, builds warning-free, ABI aligned; live Base Sepolia reads verified against the deployment |
+| **Deployment** | **live on Base Sepolia (84532)** — canonical v4 PoolManager, real USDC/WETH, live Chainlink ETH/USD feed, `riskState`/`effectiveRiskState` `Normal`; keeper `performUpkeep` exercised on-chain |
+| **Blocking issues** | UHI11 sponsor list unverified; demo clip not recorded; `Team` field incomplete |
 
 ---
 
@@ -166,11 +166,11 @@ under every oracle failure mode.
 
 ### Phase 9 — deploy, demo, docs — **IN PROGRESS**
 - [x] 9.1 deploy script rewritten for Base Sepolia: canonical PoolManager, decimals-aware seeding, oracle wiring, keeper
-- [ ] 9.2 public testnet deployment (needs `BASE_SEPOLIA_RPC_URL` + funded `DEPLOYER_PRIVATE_KEY`)
-- [ ] 9.3 seed the demo scenario on the public chain
+- [x] 9.2 public testnet deployment — Base Sepolia 84532, addresses in §10
+- [ ] 9.3 seed the demo scenario on the public chain — live vault is seeded with a curator bond and two depositors; the blocking claim is created live during the demo
 - [ ] 9.4 record the 90-second clip
 - [ ] 9.5 rehearse the run-of-show twice, timed
-- [ ] 9.6 update `docs/02-SUBMISSION.md` with real addresses
+- [x] 9.6 update `docs/02-SUBMISSION.md` with real addresses
 - [x] 9.7 repo README
 - [ ] 9.8 readiness checklist
 
@@ -206,9 +206,9 @@ under every oracle failure mode.
 |---|---|---|---|
 | 1 | UHI11's live sponsor list is unverified | Which sponsor prize we target | **Ask in the Discord today** |
 | 2 | The Nov 16 idea-submission portal is not located | Submitting on time | Get the real form from the announcement |
-| 3 | No public testnet deployment | The live demo | Run `script/Deploy.s.sol` on Base Sepolia (needs RPC + funded key) |
-| 4 | No live Automation registration | The "wired to Chainlink" claim | Register `SkylineKeeper` with Chainlink Automation on Base Sepolia, or present it as an `IAutomationCompatible` keeper and demonstrate the permissionless fallback |
-| 5 | The dashboard has never been opened in a browser | Visual QA | `npm run dev` and look at it |
+| 3 | Demo clip is not recorded | The final submission | Record the 90-second scenario in `docs/11-DEMO.md` |
+| 4 | Keeper is deployed but not registered with Chainlink Automation | The "wired to Chainlink" claim | Register `SkylineKeeper` on Base Sepolia, or present it as an `IAutomationCompatible` keeper with a permissionless fallback |
+| 5 | Live-mode dashboard has not been re-checked visually | Demo polish | Run `npm run dev` with `dashboard/.env.local` and look at every tab |
 | 6 | No fork test against a live PoolManager | The strongest remaining proof | Write `test/fork/BaseSepolia.t.sol` |
 | 7 | `performRebalance`, `migrate`, `accruePerformanceFee` have no focused unit tests | Confidence in Phase 5/6 | Write focused unit tests; `performRebalance` and fee forfeiture are exercised indirectly in `Oracle.t.sol` |
 
@@ -332,6 +332,67 @@ hook `0x95A77536A5229112397780D980C59ce6962D4f80`, vault
 
 **What is left:** unchanged from §8 — public Base Sepolia deployment, demo clip, submission
 fields. No Base Sepolia RPC URL or funded deployer key is available in the environment.
+
+---
+
+## 10. Handover notes — session of 22 November 2026
+
+**Completed:** the live Base Sepolia deployment, the dashboard's live configuration, and two
+deploy-script fixes found by running the real deployment.
+
+### 10.1 Live deployment — Base Sepolia (84532)
+
+| Item | Value |
+|---|---|
+| PoolManager (canonical v4) | `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408` |
+| SkylineHook | `0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80` |
+| SkylineVault | `0x51d200C87e05a4c3E13460E6F0D46977be2622C9` |
+| SkylineKeeper | `0x708C227792F969d62206E4d76603Aa1d1b9C5796` |
+| PoolId | `0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b` |
+| USDC (currency0) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| WETH (currency1) | `0x4200000000000000000000000000000000000006` |
+| Chainlink ETH/USD | `0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1` |
+| Deployer / curator / fee recipient | `0x27A2dD1823D883935c9824fbaC0a018cE8e891E5` |
+| Fee / tick spacing / range | `3000` / `60` / `196020..208080` |
+
+At the first live read: tick `201802`, pool liquidity `4,992,250,939,073`, depositor liquidity
+`182,896,908,595`, curator liquidity `46,354,030,478`, `totalAssets` `3,951,074` (6-decimal
+USDC), `totalSupply` `4,030,216`, NAV `0.980362839113337845`, `pendingLiquidity` `0`, risk
+`Normal`. The sub-1.0 NAV is the cost of the bootstrap swap and price impact during seeding, not
+a loss bug; the demo uses the real numbers.
+
+The Chainlink ETH/USD feed answered `171297000000` (8 decimals) with a current `updatedAt`.
+Before the keeper ran, `effectiveRiskState` was `Restricted` because the stored evaluation was
+older than `RISK_STATE_MAX_STALENESS`; calling `SkylineKeeper.performUpkeep(0x)` refreshed it and
+returned both states to `Normal`. That is the intended degrade-toward-restriction behaviour, not
+an outage.
+
+### 10.2 Deploy-script fixes
+
+- `SEED_CURATOR_BOND`, `SEED_DEPOSIT_A` and `SEED_DEPOSIT_B` are now read in **whole asset
+  units** and multiplied by the asset's `10^decimals` once. Earlier runs applied no decimal
+  scaling to these environment overrides, so `SEED_CURATOR_BOND=2` seeded 2 raw units rather
+  than 2 USDC.
+- `SALT_START` selects the first CREATE2 salt candidate. A redeploy against the same
+  PoolManager no longer collides with an existing Skyline hook. The final deployment used
+  `SALT_START=1000000`.
+
+### 10.3 Deployment traps
+
+- Two earlier attempts left abandoned vaults with idle USDC: `0xa1a89F00…82Ea2` and
+  `0xF5650CE8…58a7b`. They are **not** part of the submission. Do not deposit into them or
+  migrate from them; the share price is polluted and the vault has no idle-balance sweep.
+- The final position range is deliberately wide. A narrow range was pushed out of range by the
+  bootstrap swap, after which deposits added zero liquidity.
+- `FOUNDRY_PROFILE=deploy` is required to keep the vendored PoolManager under EIP-170.
+- `dashboard/.env.local` is gitignored. It points at the deployment above with
+  `NEXT_PUBLIC_DEMO_MODE=false`; `dashboard/.env.example` documents every variable.
+
+### 10.4 What is left
+
+Record the 90-second clip (`docs/11-DEMO.md`), fill the `Team` field, and optionally verify the
+contracts on BaseScan (needs `BASESCAN_API_KEY`) or add a fork test. The UHI11 sponsor/prize
+breakdown is still unconfirmed.
 
 ---
 

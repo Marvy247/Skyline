@@ -62,6 +62,9 @@ import {ISkylineVault} from "../src/interfaces/ISkylineVault.sol";
  *        OTHER_TOKEN           the pool's other currency. Omit for local mock mode.
  *        POOL_MANAGER          existing v4 PoolManager. Defaults to the canonical Base Sepolia
  *                              manager on chain 84532; otherwise a fresh one is deployed.
+ *        SALT_START            first CREATE2 salt candidate to try (default: 0). Set this to a
+ *                              larger value to redeploy against the same PoolManager without
+ *                              colliding with an existing Skyline hook.
  *        ORACLE                Chainlink-compatible feed. Defaults to Base Sepolia ETH/USD when
  *                              the pool is USDC/WETH on chain 84532. Set 0 to disable monitoring.
  *        CURATOR               curator of record (default: deployer)
@@ -202,7 +205,8 @@ contract DeploySkyline is Script {
     function _deployCore() internal {
         _resolveManager();
 
-        bytes32 salt = _mineSalt(manager, deployer);
+        uint256 saltStart = vm.envOr("SALT_START", uint256(0));
+        bytes32 salt = _mineSalt(manager, deployer, saltStart);
         hook = new SkylineHook{salt: salt}(manager, deployer);
 
         _initializePool();
@@ -351,9 +355,9 @@ contract DeploySkyline is Script {
 
         IERC20(asset).approve(address(vault), type(uint256).max);
 
-        uint256 curatorBond = vm.envOr("SEED_CURATOR_BOND", localMode ? 200_000 * unit : 20 * unit);
-        uint256 depositA = vm.envOr("SEED_DEPOSIT_A", localMode ? 500_000 * unit : 50 * unit);
-        uint256 depositB = vm.envOr("SEED_DEPOSIT_B", localMode ? 300_000 * unit : 30 * unit);
+        uint256 curatorBond = vm.envOr("SEED_CURATOR_BOND", localMode ? uint256(200_000) : uint256(20)) * unit;
+        uint256 depositA = vm.envOr("SEED_DEPOSIT_A", localMode ? uint256(500_000) : uint256(50)) * unit;
+        uint256 depositB = vm.envOr("SEED_DEPOSIT_B", localMode ? uint256(300_000) : uint256(30)) * unit;
 
         if (curator == deployer) {
             vault.curatorDeposit(curatorBond);
@@ -371,11 +375,11 @@ contract DeploySkyline is Script {
 
     /// @dev Brute-forces a CREATE2 salt whose address has EXACTLY the permission flags in its low
     ///      14 bits. Expected work is 2^14 = 16,384 iterations; 2,000,000 leaves a wide margin.
-    function _mineSalt(IPoolManager manager_, address hookOwner) internal pure returns (bytes32) {
+    function _mineSalt(IPoolManager manager_, address hookOwner, uint256 start) internal pure returns (bytes32) {
         bytes32 initCodeHash =
             keccak256(abi.encodePacked(type(SkylineHook).creationCode, abi.encode(manager_, hookOwner)));
 
-        for (uint256 i = 0; i < 2_000_000; i++) {
+        for (uint256 i = start; i < start + 2_000_000; i++) {
             bytes32 candidate = bytes32(i);
             address predicted = address(
                 uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), CREATE2_DEPLOYER, candidate, initCodeHash))))

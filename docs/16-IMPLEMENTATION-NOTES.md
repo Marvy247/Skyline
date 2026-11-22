@@ -356,7 +356,7 @@ position does not want half of each currency: away from the range midpoint it wa
 one side. The excess stayed in the vault as an idle balance, and `totalAssets()` values only
 `depositorLiquidity`, so the depositor's NAV silently fell.
 
-In the first live deployment, 800,000 of deposits were marked at 693,823 (NAV 0.825), and the
+In the first seeded local deployment, 800,000 of deposits were marked at 693,823 (NAV 0.825), and the
 second depositor was priced at 1.578 NAV. The vault was also holding 105,034 currency1 that
 belonged to depositors and was invisible to the share price.
 

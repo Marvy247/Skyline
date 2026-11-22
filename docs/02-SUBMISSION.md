@@ -13,7 +13,7 @@
 - [ ] Every `TODO` filled
 - [ ] Demo video link added (or placeholder committed to by 30 Nov)
 - [x] Repo link added — https://github.com/Marvy247/Skyline
-- [ ] Deployed contract addresses on testnet added
+- [x] Deployed contract addresses on testnet added
 - [ ] Theme-mapping table matches `01-PROJECT-BRIEF.md` §6
 - [ ] The "why a hook" paragraph survives the "so what, it's just a vault" objection
 - [ ] Spelling out that the curator cannot *block* depositor exits
@@ -194,7 +194,7 @@ every failure mode.
 
 ## 11. Demo
 
-A live, seeded scenario on a public testnet:
+A live, seeded scenario on Base Sepolia (addresses in §13.1):
 
 1. A curator posts a bond into a Uniswap v4 pool. Two depositors fund the same strategy.
 2. The strategy degrades. A depositor requests a withdrawal → the hook records the obligation.
@@ -220,6 +220,25 @@ manager's capital to the people whose capital they manage.
 
 ## 13. Submission fields
 
+### 13.1 Live deployment — Base Sepolia, chain 84532
+
+| Contract | Address |
+|---|---|
+| v4 PoolManager (canonical) | `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408` |
+| SkylineHook | `0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80` |
+| SkylineVault | `0x51d200C87e05a4c3E13460E6F0D46977be2622C9` |
+| SkylineKeeper | `0x708C227792F969d62206E4d76603Aa1d1b9C5796` |
+| PoolId | `0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b` |
+| USDC (currency0) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| WETH (currency1) | `0x4200000000000000000000000000000000000006` |
+| Chainlink ETH/USD | `0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1` |
+
+The pool uses fee `3000` and tick spacing `60`, with the strategy range at `196020..208080`.
+The vault is seeded with a curator bond and two depositor positions. At the time of writing,
+`riskState` and `effectiveRiskState` are `Normal`, the curator exit gate is closed only by the
+obligation ledger, and the keeper's `performUpkeep` has been exercised on-chain. The machine-
+readable artifact is `contracts/deployments/84532.json`.
+
 | Field | Value |
 |---|---|
 | Project name | Skyline |
@@ -229,7 +248,7 @@ manager's capital to the people whose capital they manage.
 | Integrations | Uniswap v4 (PoolManager, Hooks, StateLibrary), Chainlink (Price Feeds + Automation), Foundry |
 | Repo | **https://github.com/Marvy247/Skyline** |
 | Demo video | `TODO` — 90-second clip, before 30 November |
-| Deployed addresses | `TODO` — Base Sepolia (84532); deploy script and artifact schema are ready |
+| Deployed addresses | **Base Sepolia (84532)** — Hook `0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80` · Vault `0x51d200C87e05a4c3E13460E6F0D46977be2622C9` · PoolId `0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b` |
 | Team | `TODO` |
 | Track priority | Uniswap Prize (title sponsor) + Chainlink Prize + General Prize |
 
@@ -242,7 +261,7 @@ Refresh this document whenever the implementation diverges from it.
 - [x] Phase 0 confirmed the v4 position-keying model — attach the Foundry assertion output
 - [ ] Confirm which Chainlink product the prize track actually wants; adjust §10
 - [x] Replace "predefined loss-absorption rules" with the shipped rule
-- [ ] Add the actual deployed pool address, hook address, vault address
+- [x] Add the actual deployed pool address, hook address, vault address
 - [ ] Add a short architecture diagram to the submission if the form allows
 - [x] Confirm the demo scenario matches `docs/11-DEMO.md` exactly
 - [ ] Before 30 Nov progress update: publish the repo and a 90-second demo clip

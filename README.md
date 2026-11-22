@@ -46,7 +46,7 @@ breaks the core thesis or opens a fund-loss bug.
 - [ ] All Phase 0–9 tasks in `docs/07-BUILD-ORDER.md` marked complete in `docs/15-PROGRESS.md`
 - [ ] All six headline invariants in `docs/05-SECURITY.md` §4 green, including under fuzz
 - [ ] `forge test` passes; `forge fmt --check` clean; no compiler warnings
-- [ ] Deployed on a public testnet (Base Sepolia or Unichain Sepolia) with a live pool
+- [x] Deployed on a public testnet (Base Sepolia) with a live pool
 - [ ] Dashboard renders real on-chain state and the demo scenario is reproducible end-to-end
 - [ ] `docs/11-DEMO.md` run-of-show rehearsed twice, timed
 - [ ] Submission text in `docs/02-SUBMISSION.md` reflects the *shipped* implementation
@@ -133,8 +133,26 @@ Not by policy. Not by reputation. By construction.
 |---|---|
 | **Contracts** | Implemented and tested — **61 tests, all green** (33 core unit + 21 Chainlink/keeper + 7 invariants) (`contracts/`) |
 | **Dashboard** | Complete — typechecks, builds warning-free, ABI aligned (`dashboard/`) |
-| **Deployment** | Full stack deployed and exercised on local anvil; Base Sepolia config ready, public deploy pending RPC + funded key |
-| **Chainlink** | Price-feed risk regime, Automation-compatible keeper, and 21 tests — implemented and tested; live Base Sepolia feed wiring is configured but not yet exercised |
+| **Deployment** | **Live on Base Sepolia (84532)** — canonical v4 PoolManager, real USDC/WETH, live Chainlink ETH/USD feed; addresses below |
+| **Chainlink** | Price-feed risk regime and Automation-compatible keeper deployed on Base Sepolia; feed wiring and `performUpkeep` exercised on-chain |
+
+### 1d. Live deployment — Base Sepolia (84532)
+
+| Contract | Address |
+|---|---|
+| PoolManager (canonical v4) | `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408` |
+| SkylineHook | `0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80` |
+| SkylineVault | `0x51d200C87e05a4c3E13460E6F0D46977be2622C9` |
+| SkylineKeeper | `0x708C227792F969d62206E4d76603Aa1d1b9C5796` |
+| PoolId | `0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b` |
+| USDC (currency0) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| WETH (currency1) | `0x4200000000000000000000000000000000000006` |
+| Chainlink ETH/USD | `0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1` |
+
+The pool is a real USDC/WETH v4 pool (fee `3000`, tick spacing `60`) with the position range
+`196020..208080`. The vault is seeded with a curator bond and two depositors, and
+`riskState`/`effectiveRiskState` are `Normal`. The full artifact, including deployer, curator and
+seed flag, is `contracts/deployments/84532.json`.
 
 **Read `docs/16-IMPLEMENTATION-NOTES.md` before changing the design.** It records the eight
 places the implementation diverged from this specification and why — including three Uniswap v4
@@ -154,7 +172,7 @@ forge test                                              # 61 tests, all green
 FOUNDRY_PROFILE=ci forge test --match-path "test/invariant/Cep.t.sol"   # 10,000 runs
 ```
 
-The deploy path is proven locally:
+The deploy path is proven locally and live on Base Sepolia:
 
 ```bash
 anvil --port 8545 &
@@ -166,9 +184,18 @@ FOUNDRY_PROFILE=deploy forge script script/Deploy.s.sol:DeploySkyline \
 `FOUNDRY_PROFILE=deploy` is required: at the 1,000,000-run default the vendored `PoolManager`
 compiles to 26,947 bytes and exceeds the EIP-170 limit (see `docs/16` §14.3).
 
-The remaining work is **Phase 9**: deploy to a public testnet, seed the scenario, record the
-90-second clip. See `docs/15-PROGRESS.md` §3 for the per-phase checklist and §5 for the open
-issues.
+Read any deployment back with:
+
+```bash
+VAULT=0x51d200C87e05a4c3E13460E6F0D46977be2622C9 \
+HOOK=0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80 \
+MANAGER=0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408 \
+POOL_ID=0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b \
+FOUNDRY_PROFILE=deploy forge script script/Inspect.s.sol:Inspect --rpc-url "$BASE_SEPOLIA_RPC_URL"
+```
+
+The remaining work is **Phase 9**: record the 90-second clip and fill the team field. See
+`docs/15-PROGRESS.md` §3 for the per-phase checklist and §5 for the open issues.
 
 `contracts/lib` is not committed. A fresh clone installs the exact dependency set with:
 
