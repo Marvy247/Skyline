@@ -66,7 +66,7 @@ export function VerifierPanel({ state }: { state: MandateState }) {
           label="Curator Exit Parity"
           leftLabel="invariant"
           leftValue={state.verifyCep.cepHolds ? "holds" : "breached"}
-          rightLabel="curator may exit"
+          rightLabel="exit permitted now"
           rightValue={state.verifyCep.curatorMayExit ? "yes" : "no"}
         />
 
@@ -76,7 +76,8 @@ export function VerifierPanel({ state }: { state: MandateState }) {
           <code className="font-mono">verifyPending</code> on the Skyline hook. The hook derives
           them from the Uniswap v4 pool itself, so a depositor, an auditor or a rival curator can
           confirm the protocol&apos;s state without trusting the vault — and without trusting this
-          dashboard.
+          dashboard. <code className="font-mono">curatorMayExit</code> is true only when the
+          obligation ledger is empty <em>and</em> the vault&apos;s exit approval is current.
         </p>
       </div>
     </Panel>

@@ -17,39 +17,60 @@ import type { Abi } from "viem"
 /*  Environment                                                               */
 /* -------------------------------------------------------------------------- */
 
-function env(name: string): string | undefined {
-  const v = process.env[name]
+/**
+ * Next.js inlines `process.env.NEXT_PUBLIC_*` only when the property is
+ * referenced **statically**. A dynamic `process.env[name]` lookup leaves the
+ * client bundle with an empty object, silently falling back to demo mode.
+ * Read every variable once, by name, in this static object literal.
+ */
+const ENV = {
+  chainId: process.env.NEXT_PUBLIC_CHAIN_ID,
+  rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
+  hookAddress: process.env.NEXT_PUBLIC_HOOK_ADDRESS,
+  vaultAddress: process.env.NEXT_PUBLIC_VAULT_ADDRESS,
+  registryAddress: process.env.NEXT_PUBLIC_REGISTRY_ADDRESS,
+  currency0: process.env.NEXT_PUBLIC_CURRENCY0,
+  currency1: process.env.NEXT_PUBLIC_CURRENCY1,
+  fee: process.env.NEXT_PUBLIC_POOL_FEE,
+  tickSpacing: process.env.NEXT_PUBLIC_TICK_SPACING,
+  assetDecimals: process.env.NEXT_PUBLIC_ASSET_DECIMALS,
+  assetSymbol: process.env.NEXT_PUBLIC_ASSET_SYMBOL,
+  demoMode: process.env.NEXT_PUBLIC_DEMO_MODE,
+} as const
+
+function env(name: keyof typeof ENV): string | undefined {
+  const v = ENV[name]
   return v && v.length > 0 ? v : undefined
 }
 
 export const config = {
   /** Chain id the dashboard targets. 84532 = Base Sepolia, 1301 = Unichain Sepolia. */
-  chainId: Number(env("NEXT_PUBLIC_CHAIN_ID") ?? 84532),
+  chainId: Number(env("chainId") ?? 84532),
 
   rpcUrl:
-    env("NEXT_PUBLIC_RPC_URL") ??
-    (Number(env("NEXT_PUBLIC_CHAIN_ID") ?? 84532) === 1301
+    env("rpcUrl") ??
+    (Number(env("chainId") ?? 84532) === 1301
       ? "https://sepolia.unichain.org"
       : "https://sepolia.base.org"),
 
   /** SkylineHook — the enforcement point. */
-  hookAddress: env("NEXT_PUBLIC_HOOK_ADDRESS") as `0x${string}` | undefined,
+  hookAddress: env("hookAddress") as `0x${string}` | undefined,
 
   /** SkylineVault — depositor accounting, claims, settlement. */
-  vaultAddress: env("NEXT_PUBLIC_VAULT_ADDRESS") as `0x${string}` | undefined,
+  vaultAddress: env("vaultAddress") as `0x${string}` | undefined,
 
   /** CuratorRegistry. */
-  registryAddress: env("NEXT_PUBLIC_REGISTRY_ADDRESS") as `0x${string}` | undefined,
+  registryAddress: env("registryAddress") as `0x${string}` | undefined,
 
   /** Pool parameters, used to derive the PoolId on the client. */
-  currency0: (env("NEXT_PUBLIC_CURRENCY0") ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
-  currency1: (env("NEXT_PUBLIC_CURRENCY1") ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
-  fee: Number(env("NEXT_PUBLIC_POOL_FEE") ?? 3000),
-  tickSpacing: Number(env("NEXT_PUBLIC_TICK_SPACING") ?? 60),
+  currency0: (env("currency0") ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
+  currency1: (env("currency1") ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
+  fee: Number(env("fee") ?? 3000),
+  tickSpacing: Number(env("tickSpacing") ?? 60),
 
   /** USDC decimals (6 on Base). Overridable for other assets. */
-  assetDecimals: Number(env("NEXT_PUBLIC_ASSET_DECIMALS") ?? 6),
-  assetSymbol: env("NEXT_PUBLIC_ASSET_SYMBOL") ?? "USDC",
+  assetDecimals: Number(env("assetDecimals") ?? 6),
+  assetSymbol: env("assetSymbol") ?? "USDC",
 
   /**
    * DEMO MODE.
@@ -61,7 +82,7 @@ export const config = {
 
 /** True when the dashboard should render from a local fixture instead of the chain. */
 export function isDemoMode(): boolean {
-  const explicit = env("NEXT_PUBLIC_DEMO_MODE")
+  const explicit = env("demoMode")
   if (explicit === "true") return true
   if (explicit === "false") return false
   return !config.hookAddress || !config.vaultAddress

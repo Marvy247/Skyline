@@ -10,7 +10,7 @@
 
 import { Gavel, ShieldAlert, Ban } from "lucide-react"
 
-import { formatBps } from "@/lib/format"
+import { formatBps, formatFeeUnits } from "@/lib/format"
 import { Panel, PanelHeader, KeyValue, Pill } from "@/components/dashboard/primitives"
 import { riskStateLabel } from "@/lib/format"
 import type { MandateState } from "@/hooks/use-mandate"
@@ -44,7 +44,7 @@ export function MandatePanel({ state }: { state: MandateState }) {
 
       <div className="px-6 py-5">
         <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-          <KeyValue label="Maximum dynamic fee" value={formatBps(m.maxFeeBps, 3)} mono />
+          <KeyValue label="Maximum pool fee" value={formatFeeUnits(m.maxFeeBps, 3)} mono />
           <KeyValue label="Tick band (lower)" value={m.bandLower.toString()} mono />
           <KeyValue label="Tick band (upper)" value={m.bandUpper.toString()} mono />
           <KeyValue label="Minimum skin" value={formatBps(m.minSkinBps)} mono />

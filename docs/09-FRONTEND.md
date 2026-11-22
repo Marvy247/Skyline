@@ -130,6 +130,15 @@ dynamic claim list. Polling interval: 8 s.
 > helper function. A helper that widens `functionName` to `string` breaks TypeScript's inference
 > of the multicall result. This is a real trap — it cost an hour once.
 
+> **Implementation note.** Next.js only inlines `process.env.NEXT_PUBLIC_*` when the property is
+> referenced **statically**. A `process.env[name]` helper leaves the client bundle with an empty
+> object and silently forces demo mode. `lib/contracts.ts` reads every variable once, by name, in
+> the static `ENV` object.
+
+> **Implementation note.** viem decodes a tuple with **named** components as an object, not an
+> array. Read `mandate.maxDrawdownBps`, not `mandate[4]`; the array form decodes to zeros without
+> a type error if you cast it.
+
 ### 4.2 PoolId derivation
 
 The dashboard derives the v4 `PoolId` client-side:
@@ -275,14 +284,14 @@ All via environment variables — see `dashboard/.env.example`.
 
 ## 8. Acceptance criteria
 
-- [ ] `npm run typecheck` — zero errors
-- [ ] `npm run build` — succeeds with **no warnings**
-- [ ] Landing page renders with no "YourBrand" anywhere
-- [ ] `/dashboard` renders all six tabs
-- [ ] Demo mode works with no `.env` at all
-- [ ] The curator-exit attempt shows a decoded revert, not a hex blob
-- [ ] The CEP badge reflects a live `verifyCep` call
-- [ ] The PoolId derived client-side matches the deployed pool
+- [x] `npm run typecheck` — zero errors
+- [x] `npm run build` — succeeds with **no warnings**
+- [x] Landing page renders with no "YourBrand" anywhere
+- [x] `/dashboard` renders all six tabs
+- [x] Demo mode works with no `.env` at all
+- [x] The curator-exit attempt shows a decoded revert, not a hex blob
+- [x] The CEP badge reflects a live `verifyCep` call
+- [x] The PoolId derived client-side matches the deployed pool
 - [ ] Verified on a real wallet against a real testnet deployment
 - [ ] Tested at 1280×800 (the demo laptop) and on a phone
 
@@ -293,7 +302,7 @@ All via environment variables — see `dashboard/.env.example`.
 | Limitation | Explanation for a judge |
 |---|---|
 | The dashboard is a **read-mostly view**; it does not run a strategy | The strategy is a keeper/operator concern; the dashboard's job is to make the protocol's state legible |
-| Live mode needs **configured addresses** | Until deployment, the demo fixture runs the same components |
+| Live mode needs **configured addresses** | Without them the same components fall back to the demo fixture |
 | **No chart of historical performance** | Deliberate. A strategy's performance chart is the curator's marketing; Skyline's job is ordering, not performance |
 | **No multi-pool view** | Single-pool vaults are the MVP scope (`docs/01-PROJECT-BRIEF.md` §6) |
 | Errors are decoded from a **static ABI list** | A new Solidity error must be added to `mandateErrorsAbi` |

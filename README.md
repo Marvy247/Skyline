@@ -150,9 +150,13 @@ Not by policy. Not by reputation. By construction.
 | Chainlink ETH/USD | `0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1` |
 
 The pool is a real USDC/WETH v4 pool (fee `3000`, tick spacing `60`) with the position range
-`196020..208080`. The vault is seeded with a curator bond and two depositors, and
-`riskState`/`effectiveRiskState` are `Normal`. The full artifact, including deployer, curator and
-seed flag, is `contracts/deployments/84532.json`.
+`196020..208080`. The vault is seeded with a curator bond and two depositors. `riskState` is
+`Normal`; `effectiveRiskState` stays `Normal` while the keeper's evaluation is fresh and
+degrades to `Restricted` once it is more than an hour old — by design. The full artifact,
+including deployer, curator and seed flag, is `contracts/deployments/84532.json`. The complete
+demo path — claim, blocked curator exit, settlement, then a successful exit — was rehearsed
+against a Base Sepolia fork without mutating the live deployment
+(`docs/15-PROGRESS.md` §10.4).
 
 **Read `docs/16-IMPLEMENTATION-NOTES.md` before changing the design.** It records the eight
 places the implementation diverged from this specification and why — including three Uniswap v4

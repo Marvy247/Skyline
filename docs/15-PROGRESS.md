@@ -21,7 +21,7 @@
 | **Demo Day** | 11 December 2026 |
 | **Contracts** | **implemented and tested** — 61 tests green (33 core unit + 21 Chainlink/keeper + 7 invariants); fresh-clone bootstrap verified |
 | **Dashboard** | **complete** — typechecks, builds warning-free, ABI aligned; live Base Sepolia reads verified against the deployment |
-| **Deployment** | **live on Base Sepolia (84532)** — canonical v4 PoolManager, real USDC/WETH, live Chainlink ETH/USD feed, `riskState`/`effectiveRiskState` `Normal`; keeper `performUpkeep` exercised on-chain |
+| **Deployment** | **live on Base Sepolia (84532)** — canonical v4 PoolManager, real USDC/WETH, live Chainlink ETH/USD feed; `riskState` `Normal`, `effectiveRiskState` degrades to `Restricted` if the keeper evaluation is more than 1h old, by design; keeper `performUpkeep` exercised on-chain |
 | **Blocking issues** | UHI11 sponsor list unverified; demo clip not recorded; `Team` field incomplete |
 
 ---
@@ -208,9 +208,8 @@ under every oracle failure mode.
 | 2 | The Nov 16 idea-submission portal is not located | Submitting on time | Get the real form from the announcement |
 | 3 | Demo clip is not recorded | The final submission | Record the 90-second scenario in `docs/11-DEMO.md` |
 | 4 | Keeper is deployed but not registered with Chainlink Automation | The "wired to Chainlink" claim | Register `SkylineKeeper` on Base Sepolia, or present it as an `IAutomationCompatible` keeper with a permissionless fallback |
-| 5 | Live-mode dashboard has not been re-checked visually | Demo polish | Run `npm run dev` with `dashboard/.env.local` and look at every tab |
-| 6 | No fork test against a live PoolManager | The strongest remaining proof | Write `test/fork/BaseSepolia.t.sol` |
-| 7 | `performRebalance`, `migrate`, `accruePerformanceFee` have no focused unit tests | Confidence in Phase 5/6 | Write focused unit tests; `performRebalance` and fee forfeiture are exercised indirectly in `Oracle.t.sol` |
+| 5 | No fork test against a live PoolManager | The strongest remaining proof | Write `test/fork/BaseSepolia.t.sol`; the scenario has been rehearsed manually on a Base Sepolia fork (§10.4) |
+| 6 | `performRebalance`, `migrate`, `accruePerformanceFee` have no focused unit tests | Confidence in Phase 5/6 | Write focused unit tests; `performRebalance` and fee forfeiture are exercised indirectly in `Oracle.t.sol` |
 
 ---
 
@@ -337,8 +336,9 @@ fields. No Base Sepolia RPC URL or funded deployer key is available in the envir
 
 ## 10. Handover notes — session of 22 November 2026
 
-**Completed:** the live Base Sepolia deployment, the dashboard's live configuration, and two
-deploy-script fixes found by running the real deployment.
+**Completed:** the live Base Sepolia deployment, the dashboard's live configuration (and two
+client-side decoding bugs found by pointing it at the deployment), and two deploy-script fixes
+found by running the real deployment. The full demo path was rehearsed on a Base Sepolia fork.
 
 ### 10.1 Live deployment — Base Sepolia (84532)
 
@@ -377,7 +377,41 @@ an outage.
   PoolManager no longer collides with an existing Skyline hook. The final deployment used
   `SALT_START=1000000`.
 
-### 10.3 Deployment traps
+### 10.3 Dashboard live-mode fixes
+
+Two bugs kept the dashboard in demo mode even with `.env.local` configured:
+
+- `lib/contracts.ts` read variables through `process.env[name]`. Next.js only inlines
+  `process.env.NEXT_PUBLIC_*` when the property is referenced statically, so the browser bundle
+  saw an empty object and fell back to the fixture. Every variable is now read once, by name, in
+  a static `ENV` object.
+- viem returns **named** tuple components as objects, not arrays. `mandate`, `poolConfigs` and
+  `claim` were being indexed as `m[0]`/`cfg[1]`/`c[6]`, so every field decoded as zero. They now
+  read the named fields.
+
+The live-mode dashboard was then rebuilt and checked in headless Chrome against the Base Sepolia
+deployment: the context strip shows the real hook/vault/pool, the CEP badge reads `verifyCep`,
+NAV/share renders `0.9803`, the mandate tab shows the correct `0.300%` fee cap, 10% skin and 10%
+drawdown limit, and all six tabs render without a wallet.
+
+### 10.4 Live-path rehearsal on a Base Sepolia fork
+
+The whole demo path was executed against an anvil fork of Base Sepolia (chain id 84532,
+`--auto-impersonate`), so the live deployment was not mutated:
+
+| Step | Result |
+|---|---|
+| `requestWithdraw(500,000 shares)` | claim 0 registered; pending `22,690,688,424` liquidity units; `isCuratorExitBlocked` → `true` |
+| `requestCuratorExit()` | reverted `CuratorExitBlocked(22690688424)` — the hook, not the vault, refused |
+| `settleClaims(10)` | claim settled; pending → `0`; `isCuratorExitBlocked` → `false` |
+| `requestCuratorExit()` | approved by the hook |
+| `curatorExit(46,354,030,478)` | succeeded; curator liquidity → `0`; proceeds `998,040` (0.99804 USDC) |
+
+This is the exact sequence for the 90-second clip. The live deployment is back at its seeded
+state: `pendingLiquidity` `0`, curator liquidity `46,354,030,478`, and `riskState` `Normal`;
+`effectiveRiskState` is `Normal` immediately after a keeper refresh.
+
+### 10.5 Deployment traps
 
 - Two earlier attempts left abandoned vaults with idle USDC: `0xa1a89F00…82Ea2` and
   `0xF5650CE8…58a7b`. They are **not** part of the submission. Do not deposit into them or
@@ -388,7 +422,7 @@ an outage.
 - `dashboard/.env.local` is gitignored. It points at the deployment above with
   `NEXT_PUBLIC_DEMO_MODE=false`; `dashboard/.env.example` documents every variable.
 
-### 10.4 What is left
+### 10.6 What is left
 
 Record the 90-second clip (`docs/11-DEMO.md`), fill the `Team` field, and optionally verify the
 contracts on BaseScan (needs `BASESCAN_API_KEY`) or add a fork test. The UHI11 sponsor/prize

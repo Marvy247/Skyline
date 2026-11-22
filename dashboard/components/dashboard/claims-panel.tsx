@@ -210,7 +210,7 @@ export function VaultStatsPanel({ state }: { state: MandateState }) {
   const navPerShare = state.navPerShare
   const hwm = state.highWaterMark
   const drawdownBps =
-    hwm > 0n ? Number(((hwm - navPerShare) * 10_000n) / hwm) : 0
+    hwm > navPerShare ? Number(((hwm - navPerShare) * 10_000n) / hwm) : 0
 
   return (
     <Panel>
@@ -226,17 +226,16 @@ export function VaultStatsPanel({ state }: { state: MandateState }) {
           value={`${formatUnits(state.totalAssets, 6)}`}
           hint="USDC"
         />
-        <Stat label="Your shares" value={formatUnits(state.userShares, 6)} hint="of 1.000000" />
+        <Stat label="Your shares" value={formatUnits(state.userShares, 6)} hint={`of ${formatUnits(state.totalSupply, 6)}`} />
         <Stat
           label="NAV / share"
-          value={navPerShare > 0n ? `${Number(navPerShare) / 1e6}` : "—"}
+          value={navPerShare > 0n ? formatUnits(navPerShare, 18, 4) : "—"}
           hint="USDC"
         />
         <Stat
-          label="Drawdown vs HWM"
+          label="NAV vs HWM"
           value={`${(drawdownBps / 100).toFixed(2)}%`}
-          hint={`limit ${(state.mandate.maxDrawdownBps / 100).toFixed(1)}%`}
-          tone={drawdownBps >= state.mandate.maxDrawdownBps ? "red" : "neutral"}
+          hint={`HWM ${formatUnits(hwm, 18, 4)}`}
         />
       </div>
     </Panel>

@@ -235,9 +235,11 @@ manager's capital to the people whose capital they manage.
 
 The pool uses fee `3000` and tick spacing `60`, with the strategy range at `196020..208080`.
 The vault is seeded with a curator bond and two depositor positions. At the time of writing,
-`riskState` and `effectiveRiskState` are `Normal`, the curator exit gate is closed only by the
-obligation ledger, and the keeper's `performUpkeep` has been exercised on-chain. The machine-
-readable artifact is `contracts/deployments/84532.json`.
+the stored `riskState` is `Normal`; `effectiveRiskState` is `Normal` while the keeper's
+evaluation is fresh and degrades to `Restricted` once it is more than an hour old, by design.
+The curator exit gate is closed only by the obligation ledger, and the keeper's
+`performUpkeep` has been exercised on-chain. The machine-readable artifact is
+`contracts/deployments/84532.json`.
 
 | Field | Value |
 |---|---|

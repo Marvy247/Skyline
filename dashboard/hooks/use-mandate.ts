@@ -237,16 +237,33 @@ export function useMandate(scenarioParam: string | null = null) {
 
         if (cancelled) return
 
-        const cfg = ok<readonly [Address, Address, Address, boolean]>(poolConfig, [
-          "0x0000000000000000000000000000000000000000",
-          "0x0000000000000000000000000000000000000000",
-          "0x0000000000000000000000000000000000000000",
-          false,
-        ])
+        const cfg = ok<{ vault: Address; curator: Address; oracle: Address; registered: boolean }>(
+          poolConfig,
+          {
+            vault: "0x0000000000000000000000000000000000000000",
+            curator: "0x0000000000000000000000000000000000000000",
+            oracle: "0x0000000000000000000000000000000000000000",
+            registered: false,
+          },
+        )
 
-        const m = ok<readonly [number, number, number, number, number, number, number]>(mandate, [
-          0, 0, 0, 0, 0, 0, 0,
-        ])
+        const m = ok<{
+          maxFeeBps: number
+          bandLower: number
+          bandUpper: number
+          minSkinBps: number
+          maxDrawdownBps: number
+          claimTtl: number
+          riskState: number
+        }>(mandate, {
+          maxFeeBps: 0,
+          bandLower: 0,
+          bandUpper: 0,
+          minSkinBps: 0,
+          maxDrawdownBps: 0,
+          claimTtl: 0,
+          riskState: 0,
+        })
 
         const nextId = big(ok(nextClaimId, 0n))
 
@@ -265,17 +282,31 @@ export function useMandate(scenarioParam: string | null = null) {
 
         const claims: Claim[] = claimResults
           .map((entry, i) => {
-            const c = ok<
-              readonly [bigint, bigint, bigint, bigint, bigint, number, Address]
-            >(entry, [0n, 0n, 0n, 0n, 0n, 0, "0x0000000000000000000000000000000000000000"])
+            const c = ok<{
+              liquidityAmount: bigint
+              settledAmount: bigint
+              totalLiquidityAtRegistration: bigint
+              registeredAt: bigint
+              expiresAt: bigint
+              status: number
+              depositor: Address
+            }>(entry, {
+              liquidityAmount: 0n,
+              settledAmount: 0n,
+              totalLiquidityAtRegistration: 0n,
+              registeredAt: 0n,
+              expiresAt: 0n,
+              status: 0,
+              depositor: "0x0000000000000000000000000000000000000000",
+            })
             return {
               claimId: BigInt(i),
-              depositor: c[6],
-              liquidityAmount: c[0],
-              settledAmount: c[1],
-              registeredAt: c[3],
-              expiresAt: c[4],
-              status: num(c[5]),
+              depositor: c.depositor,
+              liquidityAmount: c.liquidityAmount,
+              settledAmount: c.settledAmount,
+              registeredAt: c.registeredAt,
+              expiresAt: c.expiresAt,
+              status: num(c.status),
             }
           })
           .filter((c) => c.status !== 0)
@@ -295,7 +326,7 @@ export function useMandate(scenarioParam: string | null = null) {
           poolId,
           hookAddress,
           vaultAddress,
-          curatorAddress: cfg[1],
+          curatorAddress: cfg.curator,
           depositorAddress: address,
           pendingLiquidity: big(ok(pending, 0n)),
           curatorLiquidity: big(ok(curatorLiq, 0n)),
@@ -306,13 +337,13 @@ export function useMandate(scenarioParam: string | null = null) {
           effectiveRiskState: num(ok(effectiveRisk, 0)),
           riskStateUpdatedAt: big(ok(riskUpdatedAt, 0n)),
           mandate: {
-            maxFeeBps: num(m[0]),
-            bandLower: num(m[1]),
-            bandUpper: num(m[2]),
-            minSkinBps: num(m[3]),
-            maxDrawdownBps: num(m[4]),
-            claimTtl: num(m[5]),
-            riskState: num(m[6]),
+            maxFeeBps: num(m.maxFeeBps),
+            bandLower: num(m.bandLower),
+            bandUpper: num(m.bandUpper),
+            minSkinBps: num(m.minSkinBps),
+            maxDrawdownBps: num(m.maxDrawdownBps),
+            claimTtl: num(m.claimTtl),
+            riskState: num(m.riskState),
           },
           claims,
           nextClaimId: nextId,

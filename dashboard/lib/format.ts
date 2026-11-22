@@ -32,6 +32,16 @@ export function formatBps(bps: number | bigint | undefined | null, maxFrac = 2):
   return `${(n / 100).toFixed(maxFrac)}%`
 }
 
+/**
+ * Format a Uniswap v4 fee (hundredths of a bip, where 1_000_000 = 100%) as a
+ * percentage string, e.g. 3000 -> "0.300%".
+ */
+export function formatFeeUnits(fee: number | bigint | undefined | null, maxFrac = 3): string {
+  if (fee === undefined || fee === null) return "—"
+  const n = typeof fee === "bigint" ? Number(fee) : fee
+  return `${(n / 10_000).toFixed(maxFrac)}%`
+}
+
 /** Format a unix timestamp (seconds) as a relative time, e.g. "in 23h" / "6m ago". */
 export function formatRelativeTime(unixSeconds: bigint | number | undefined | null): string {
   if (unixSeconds === undefined || unixSeconds === null) return "—"
