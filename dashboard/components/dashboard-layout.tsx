@@ -112,6 +112,7 @@ export function DashboardLayout({
                           : "text-slate-500 hover:text-sky-600 hover:bg-sky-50/50",
                       )}
                       aria-current={isActive ? "page" : undefined}
+                      aria-label={item.name}
                     >
                       <Icon className={cn("w-5 h-5 transition-transform group-hover:scale-110", isActive && "scale-110")} />
                       {item.badge && (

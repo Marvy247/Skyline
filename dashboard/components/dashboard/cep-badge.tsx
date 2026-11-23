@@ -34,7 +34,9 @@ export function CepBadge({
         detail:
           state.pendingLiquidity > 0n
             ? `The curator cannot exit — ${formatLiquidity(state.pendingLiquidity)} liquidity units of depositor obligation are outstanding.`
-            : "No outstanding obligations block the curator's exit.",
+            : mayExit
+              ? "No outstanding obligations block the curator's exit."
+              : "The obligation ledger is clear. The vault has not yet approved the curator's exit.",
       }
     : {
         tone: "red",
@@ -118,7 +120,7 @@ export function CepBadge({
             />
             <Badge
               label="Curator may exit"
-              value={mayExit ? "Yes" : "No"}
+              value={mayExit ? "Yes" : state.pendingLiquidity > 0n ? "No — obligation" : "No — approval"}
               tone={mayExit ? "emerald" : "red"}
             />
           </div>

@@ -27,7 +27,7 @@ import { useMandateActions, parseAssetAmount } from "@/hooks/use-mandate-actions
 
 export function ClaimsPanel({ state }: { state: MandateState }) {
   const actions = useMandateActions()
-  const [amount, setAmount] = useState("10000")
+  const [amount, setAmount] = useState("0.5")
 
   const active = state.claims.filter((c) => c.status === 1 || c.status === 4)
   const closed = state.claims.filter((c) => c.status === 2 || c.status === 3)
@@ -41,7 +41,7 @@ export function ClaimsPanel({ state }: { state: MandateState }) {
         accent="sky"
         right={
           <Pill tone={active.length > 0 ? "amber" : "emerald"}>
-            {active.length} open · {state.nextClaimId - 1n} total
+            {active.length} open · {state.nextClaimId} total
           </Pill>
         }
       />
@@ -107,14 +107,14 @@ export function ClaimsPanel({ state }: { state: MandateState }) {
         <div className="grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2">
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Register a withdrawal
+              Register a withdrawal (vault shares)
             </p>
             <div className="mt-3 flex gap-2">
               <input
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 inputMode="decimal"
-                placeholder="10,000"
+                placeholder="0.5"
                 className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
               />
               <button
@@ -132,8 +132,8 @@ export function ClaimsPanel({ state }: { state: MandateState }) {
               </button>
             </div>
             <p className="mt-2 text-xs text-slate-500">
-              Registers a FIFO claim. The hook records the obligation and immediately locks the
-              curator&apos;s exit.
+              Registers a FIFO claim for that many shares, redeemed at NAV. The hook records the
+              obligation and immediately locks the curator&apos;s exit.
             </p>
           </div>
 
