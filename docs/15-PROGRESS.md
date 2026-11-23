@@ -19,7 +19,7 @@
 | **Idea submission deadline** | 16 November 2026 — **passed; submission status unconfirmed** |
 | **Final submission deadline** | 3 December 2026 |
 | **Demo Day** | 11 December 2026 |
-| **Contracts** | **implemented and tested** — 61 tests green (33 core unit + 21 Chainlink/keeper + 7 invariants); fresh-clone bootstrap verified |
+| **Contracts** | **implemented and tested** — 65 tests green (37 core unit + 21 Chainlink/keeper + 7 invariants); fresh-clone bootstrap verified |
 | **Dashboard** | **complete** — typechecks, builds warning-free, ABI aligned; live Base Sepolia reads verified against the deployment |
 | **Deployment** | **live on Base Sepolia (84532)** — canonical v4 PoolManager, real USDC/WETH, live Chainlink ETH/USD feed; `riskState` `Normal`, `effectiveRiskState` degrades to `Restricted` if the keeper evaluation is more than 1h old, by design; keeper `performUpkeep` exercised on-chain |
 | **Blocking issues** | UHI11 sponsor list unverified; demo clip not recorded |
@@ -49,6 +49,7 @@
 | `unit/Primitives.t.sol` | 8 | The v4 mechanics the design rests on: position keying, salt separation, owner-only modification, shadow-counter accuracy, deposit pricing |
 | `unit/ClaimLedger.t.sol` | 17 | The ledger, the exit gate (both the approval refusal and the removal block), approval revocation, expiry, claim limits |
 | `unit/ExitLadder.t.sol` | 8 | **The demo script.** Stage 1/2/3, the worked example, liveness |
+| `unit/ClaimAccounting.t.sol` | 4 | Share reservation, full settlement, bond-shortfall settlement, permissionless expiry |
 | `Oracle.t.sol` | 21 | Chainlink risk regime: every feed failure mode, HWM ratchet, breach confirmation, keeper, fuzzed INV-5 |
 | `invariant/Cep.t.sol` | 7 invariants | INV-1 … INV-6 plus shadow-counter and over-settlement checks. 2,000 runs × 100,000 calls, 0 reverts |
 | `utils/SkylineFixture.sol` | — | Deploys PoolManager, tokens, hook (etched onto a permission-correct address), pool, vault; registers the pool; seeds the bootstrap position |
@@ -428,6 +429,43 @@ Record the 90-second clip (`docs/11-DEMO.md`) and fill the video link in
 `docs/02-SUBMISSION.md`. The `Team` field is **Marvy247**. Optionally verify the contracts on
 BaseScan (needs `BASESCAN_API_KEY`) or add a fork test. The UHI11 sponsor/prize breakdown is
 still unconfirmed.
+
+---
+
+## 11. Accounting fix — session of 23 November 2026
+
+A review of the claim queue found three defects in the share ledger. All are fixed in
+`SkylineVault`, covered by `test/unit/ClaimAccounting.t.sol`, and green in the full suite.
+
+| Defect | Consequence | Fix |
+|---|---|---|
+| `totalSupply` was never reduced when a claim settled | Phantom shares remained after every withdrawal, diluting the depositors who stayed | `_serve` burns the claim's shares proportionally as each settlement slice is paid |
+| A partial pro-rata settlement restored **all** reserved shares on expiry | A depositor could be paid for part of a claim and then recover the shares behind the whole claim | Only the unburned residue is restored; paid-for shares stay burned |
+| Only the depositor could cancel an expired claim | A depositor who walked away could pin the curator's bond indefinitely | `cancelClaim` is permissionless after the TTL; the shares still return to the depositor |
+
+The bond-stage settlement now advances the claim ledger through `_serve` as well, rather than only
+in the depositor stage. `ClaimAccounting.t.sol` reconciles `totalSupply` against liquid plus
+reserved shares after every path.
+
+`invariant_oracleNeverBlocksDepositors` was asserting `!blocked => pending == 0`. That is too
+strong: the deliberate last-resort state has `pending > depositorLiquidity` and
+`isCuratorExitBlocked == false`, because at that point the gate's remaining job is to bound the
+vault's bond removal to the shortfall, not to pretend the claim can be served from depositor
+liquidity. Curator approval still requires an empty ledger. The invariant now permits the state
+only when the depositor's own position provably cannot serve the claim.
+
+**Suite:** 65 tests, 0 failures; 7 invariants at 2,000 runs × 100,000 calls.
+
+**Live deployment:** Base Sepolia still runs the pre-fix bytecode. Redeploy before recording if
+the deployment is meant to match the repository.
+
+**Periphery to cut or fix before submission:** `migrate` and `performRebalance` have no focused
+success-path tests. `migrate` burns shares against bond-inclusive assets while moving
+depositor-only assets, and its target-vault transfer has no allowance path. `performRebalance`
+removes both positions but re-adds only the depositor position, requires prior exit approval for
+the curator removal, and leaves the curator's proceeds idle with a stale `curatorBondValue`.
+Neither is on the demo path. The safest submission surface is the tested claim queue plus
+`curatorDeposit`; do not demo or advertise the other two until they are rewritten and tested.
 
 ---
 
