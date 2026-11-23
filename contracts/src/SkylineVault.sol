@@ -384,6 +384,16 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
         bytes memory tag = SkylineTypes.encodeSettlement(claimId);
         IERC20 other = IERC20(Currency.unwrap(_currency1()));
 
+        uint128 remainingBefore = c.liquidityAmount - c.settledLiquidity;
+        if (take > remainingBefore) take = remainingBefore;
+
+        // Burn the shares that this settlement actually redeems. Doing it per-serve (rather
+        // than only on full settlement) is what keeps `totalSupply` honest after a partial
+        // pro-rata settlement, and what stops an expired claim from restoring shares that
+        // have already been paid for.
+        _burnSettledShares(c, take, remainingBefore);
+        c.settledLiquidity += take;
+
         uint256 balanceBefore = asset.balanceOf(address(this));
         uint256 otherBefore = other.balanceOf(address(this));
 
@@ -391,7 +401,6 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
         uint128 fromDepositor = take > depositorLiquidity ? depositorLiquidity : take;
         if (fromDepositor > 0) {
             _removeLiquidity(SkylineTypes.LP_SALT, fromDepositor, tag);
-            c.settledLiquidity += fromDepositor;
         }
 
         // --- Stage 2: the curator's bond absorbs the shortfall ---
@@ -435,14 +444,48 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
         }
     }
 
-    /// @dev Closes a claim, releasing the reserved shares.
+    /// @dev Burns the proportional share of a claim's reserved shares that `take` redeems.
+    ///      A partial settlement leaves at least one share in the claim so its remaining
+    ///      obligation can still be settled or restored on expiry.
+    function _burnSettledShares(ClaimRecord storage c, uint128 take, uint128 remainingBefore) internal {
+        if (take == 0 || remainingBefore == 0) return;
+
+        uint256 shares = c.shares;
+        if (shares == 0) return;
+
+        uint256 burned;
+        if (take >= remainingBefore) {
+            burned = shares;
+        } else {
+            burned = (shares * uint256(take)) / uint256(remainingBefore);
+            if (burned >= shares) burned = shares - 1;
+        }
+
+        if (burned == 0) return;
+
+        c.shares = shares - burned;
+        reservedShares[c.depositor] -= burned;
+        totalSupply -= burned;
+    }
+
+    /// @dev Closes a claim, burning any shares still reserved for it.
     function _closeClaim(ClaimRecord storage c) internal {
         c.status = uint8(SkylineTypes.ClaimStatus.Settled);
-        reservedShares[c.depositor] -= c.shares;
+
+        uint256 remaining = c.shares;
+        if (remaining > 0) {
+            c.shares = 0;
+            reservedShares[c.depositor] -= remaining;
+            totalSupply -= remaining;
+        }
+
         if (openClaimCount > 0) openClaimCount--;
     }
 
     /// @notice Cancels an expired claim and restores the depositor's shares.
+    /// @dev Permissionless after expiry. The depositor already had the full TTL to settle;
+    ///      leaving an expired claim open would let a depositor grief the curator's capital
+    ///      indefinitely. The shares always return to the depositor.
     /// @param claimId The claim to cancel.
     function cancelClaim(uint256 claimId) external nonReentrant {
         ClaimRecord storage c = claims[claimId];
@@ -452,7 +495,6 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
         ) {
             revert InvalidClaimStatus();
         }
-        if (msg.sender != c.depositor) revert NotCurator();
 
         // The hook expires the claim and decrements its ledger.
         hook.expireClaim(poolId, claimId);

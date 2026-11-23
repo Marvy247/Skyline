@@ -153,8 +153,16 @@ contract CepInvariantTest is StdInvariant, SkylineFixture {
         // The exit gate depends only on the ledger.
         bool blocked = hook.isCuratorExitBlocked(poolId);
         int128 pending = hook.pendingLiquidity(poolId);
-        if (!blocked) {
-            assertEq(pending, 0, "the curator may only be unblocked with an empty ledger");
+        if (!blocked && pending > 0) {
+            // An unblocked curator with an outstanding ledger is only legitimate in the
+            // insolvent last resort: the depositors' own position provably cannot serve the
+            // claim, so the bond stage has taken over. A healthy ledger must never be left
+            // unblocked.
+            assertGt(
+                pending,
+                hook.depositorLiquidity(poolId),
+                "the curator may only be unblocked with an empty ledger or an insolvent one"
+            );
         }
     }
 
