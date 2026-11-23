@@ -234,16 +234,31 @@ Plan for the failure.
 
 ## 8. Recording a 90-second clip (needed by 30 Nov)
 
-Shot list:
+Record against the **live Base Sepolia dashboard**, connected to the wallet that holds the seeded
+shares. The live deployment is at its initial state: `pendingLiquidity` `0`, claim queue empty,
+`curatorExitApproved` false. The keeper was refreshed at 16:23 UTC on 23 November; its evaluation
+is fresh for one hour. After that, `effectiveRiskState` is `Restricted` — the badge still says
+CEP is enforced, and depositor exits still work. Refresh the keeper if the mandate panel's
+`Restricted` label would distract.
 
-1. Dashboard, Overview tab, CEP badge (3 s)
-2. Exit gate tab — the source code of the gate (4 s)
-3. Click "Attempt curator exit" — the decoded revert (5 s)
-4. Exit ladder — who absorbs what (4 s)
-5. Verification tab — pool-derived vs recorded (4 s)
-6. Landing page hero (3 s)
+**Do not call `curatorExit`.** The last step only requests the vault's exit approval. Calling
+`curatorExit` on the live deployment consumes the seeded curator bond before Demo Day.
+
+| Time | Tab / action | What the viewer sees |
+|---|---|---|
+| 0:00–0:06 | Overview | Title card or the CEP badge: **Curator Exit Parity: ENFORCED** |
+| 0:06–0:12 | Connect wallet | The seeded address and its 4.03 shares |
+| 0:12–0:24 | Claims → `0.5` → Request | Claim `#0` appears; `pendingLiquidity` becomes `22,690,688,424` |
+| 0:24–0:36 | Exit gate → Attempt curator exit | **`CuratorExitBlocked(22690688424)`**, decoded in plain English |
+| 0:36–0:44 | "Why is it blocked?" | The hook's ledger, not the vault's opinion; not a timelock |
+| 0:44–0:56 | Claims → Settle claims | Claim settles FIFO; `pendingLiquidity` returns to `0` |
+| 0:56–1:08 | Exit gate → Attempt curator exit | This time it succeeds: the vault grants exit approval |
+| 1:08–1:20 | Verification | Raw hook state: pending `0`, `curatorExitBlocked` false |
+| 1:20–1:30 | Overview / close | One line: **the curator cannot run** |
 
 Record at 1920×1080, no audio needed, no cursor jitter. **This is the submission's demo link.**
+The exact cast commands, selectors and expected values are in §9.2; the rehearsal transcript is
+in `docs/15-PROGRESS.md` §10.4.
 
 ---
 

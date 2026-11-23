@@ -15,7 +15,7 @@
 | Field | Value |
 |---|---|
 | **Phase** | Phase 9 — live Base Sepolia deployment **DONE**; demo clip/submission fields in progress |
-| **Last updated** | 22 November 2026 |
+| **Last updated** | 23 November 2026 |
 | **Idea submission deadline** | 16 November 2026 — **passed; submission status unconfirmed** |
 | **Final submission deadline** | 3 December 2026 |
 | **Demo Day** | 11 December 2026 |
