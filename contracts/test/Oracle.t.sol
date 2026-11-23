@@ -161,12 +161,6 @@ contract OracleTest is SkylineFixture {
         vm.expectRevert(SkylineVault.RiskStateRestricted.selector);
         vault.curatorDeposit(10_000e18);
 
-        // The hook itself would also reject the callback, so the block does not depend on the
-        // vault's courtesy check.
-        vm.prank(curator);
-        vm.expectRevert(SkylineVault.RiskStateRestricted.selector);
-        vault.performRebalance(TICK_LOWER - 60, TICK_UPPER + 60, 1);
-
         // A depositor can still enter. The risk regime is not a depositor gate.
         depositAs(alice, 10_000e18);
     }

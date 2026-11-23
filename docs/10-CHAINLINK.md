@@ -58,7 +58,7 @@ enum RiskState { Normal, Restricted, Breached }
 | State | Condition | Effect |
 |---|---|---|
 | **Normal** | drawdown < `maxDrawdownBps` | Full curator authority within the mandate |
-| **Restricted** | drawdown ≥ `maxDrawdownBps`, **or** the feed is unavailable/stale, **or** the evaluation is older than `RISK_STATE_MAX_STALENESS` | **Risk-increasing** curator actions frozen: `curatorDeposit`, liquidity adds, `performRebalance`. Curator **exit remains available**, subject to the exit gate. Depositor actions unaffected. |
+| **Restricted** | drawdown ≥ `maxDrawdownBps`, **or** the feed is unavailable/stale, **or** the evaluation is older than `RISK_STATE_MAX_STALENESS` | **Risk-increasing** curator actions frozen: `curatorDeposit` and liquidity adds. Curator **exit remains available**, subject to the exit gate. Depositor actions unaffected. |
 | **Breached** | drawdown ≥ 2 × `maxDrawdownBps` on **two consecutive** evaluations | As Restricted, **plus** the performance fee is forfeited for the epoch. The bond is already exposed to outstanding claims by the exit ladder; the breach does not create a new slashing path. |
 
 ### 3.1 Locking is not slashing, and restriction is not punishment

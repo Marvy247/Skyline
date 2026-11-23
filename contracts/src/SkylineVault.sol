@@ -172,8 +172,6 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
     event ShortfallAbsorbed(address indexed curator, uint256 amount, uint256 remainingShortfall);
     event PerformanceFeeAccrued(uint256 feeShares, uint256 hwm, uint256 navPerShare);
     event PerformanceFeeForfeited(uint256 hwm, uint256 navPerShare);
-    event Rebalanced(int24 tickLower, int24 tickUpper, uint128 liquidity);
-    event Migrated(address indexed to, uint256 assets, uint256 shares);
 
     /* -------------------------------------------------------------------------- */
     /*                                  Errors                                    */
@@ -537,15 +535,29 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
         if (!curatorExitRequested) revert CoolingOff();
         if (liquidity > curatorLiquidity) revert InsufficientAssets();
 
-        // `_removeLiquidity` already updates the curator's liquidity counter.
-        uint256 gross = _removeLiquidity(SkylineTypes.CURATOR_SALT, liquidity, bytes(""));
+        uint128 liquidityBefore = curatorLiquidity;
+        uint256 balanceBefore = asset.balanceOf(address(this));
+        IERC20 other = IERC20(Currency.unwrap(_currency1()));
+        uint256 otherBefore = other.balanceOf(address(this));
 
+        // `_removeLiquidity` already updates the curator's liquidity counter.
+        _removeLiquidity(SkylineTypes.CURATOR_SALT, liquidity, bytes(""));
+
+        // The position returns both currencies. Convert the non-asset side before paying, or half
+        // of the curator's bond is stranded in the vault as the wrong token.
+        uint256 otherReceived = other.balanceOf(address(this)) - otherBefore;
+        if (otherReceived > 0) _swapExactInput(otherReceived, false);
+
+        uint256 gross = asset.balanceOf(address(this)) - balanceBefore;
         uint256 netted = gross < uncoveredShortfall ? gross : uncoveredShortfall;
         uncoveredShortfall -= netted;
         proceeds = gross - netted;
 
+        // The bond's recorded value is a cost basis, not a live mark. Remove it in proportion to
+        // the liquidity that left, so a full exit clears it and a partial exit keeps the
+        // remaining basis. Reducing by `gross` would leave phantom bond value after a full exit.
         uint256 bondValue = curatorBondValue;
-        curatorBondValue = bondValue > netted ? bondValue - netted : 0;
+        curatorBondValue = liquidityBefore == 0 ? 0 : bondValue - (bondValue * liquidity) / liquidityBefore;
 
         asset.safeTransfer(msg.sender, proceeds);
         curatorExitRequested = false;
@@ -556,44 +568,6 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
     /* -------------------------------------------------------------------------- */
     /*                                Strategy                                    */
     /* -------------------------------------------------------------------------- */
-
-    /// @notice Moves both the depositor position and the curator bond into a new tick range.
-    /// @param newTickLower The new lower bound.
-    /// @param newTickUpper The new upper bound.
-    /// @param liquidity The target liquidity for the depositor position.
-    function performRebalance(int24 newTickLower, int24 newTickUpper, uint128 liquidity)
-        external
-        onlyCurator
-        nonReentrant
-    {
-        if (newTickUpper <= newTickLower) revert InvalidTickRange();
-
-        // Rebalancing is a risk-increasing operation: it moves the strategy while the external
-        // mark says it is outside its mandate. Freeze it in `Restricted`/`Breached`.
-        if (hook.effectiveRiskState(poolId) >= uint8(SkylineTypes.RiskState.Restricted)) {
-            revert RiskStateRestricted();
-        }
-
-        // Remove from the old range, add to the new one. Both positions move together so the
-        // curator's bond always tracks the strategy it is bonded to.
-        if (depositorLiquidity > 0) {
-            _removeLiquidity(SkylineTypes.LP_SALT, depositorLiquidity, bytes(""));
-        }
-        if (curatorLiquidity > 0) {
-            _removeLiquidity(SkylineTypes.CURATOR_SALT, curatorLiquidity, bytes(""));
-        }
-
-        tickLower = newTickLower;
-        tickUpper = newTickUpper;
-
-        if (liquidity > 0) {
-            uint256 required = _assetsForLiquidity(liquidity);
-            asset.safeTransferFrom(msg.sender, address(this), required);
-            _addLiquidity(SkylineTypes.LP_SALT, liquidity);
-        }
-
-        emit Rebalanced(newTickLower, newTickUpper, depositorLiquidity);
-    }
 
     /// @notice Accrues the high-water-mark performance fee by minting dilution-only shares.
     /// @return feeShares The shares minted to the fee recipient.
@@ -626,26 +600,6 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
         highWaterMark = nav;
 
         emit PerformanceFeeAccrued(feeShares, highWaterMark, nav);
-    }
-
-    /// @notice Migrates a depositor's position into another vault in a single transaction.
-    /// @param assets The amount to migrate.
-    /// @param target The destination vault.
-    /// @return shares The shares minted in the destination.
-    function migrate(uint256 assets, address target) external nonReentrant returns (uint256 shares) {
-        uint256 userShares = balanceOf[msg.sender];
-        if (assets == 0) revert ZeroAmount();
-
-        uint256 sharesToBurn = (assets * totalSupply) / _totalAssetsIncludingBond();
-        if (sharesToBurn > userShares - reservedShares[msg.sender]) revert InsufficientShares();
-
-        balanceOf[msg.sender] -= sharesToBurn;
-        totalSupply -= sharesToBurn;
-
-        asset.safeTransfer(target, assets);
-        shares = ISkylineVault(target).deposit(assets, msg.sender);
-
-        emit Migrated(target, assets, shares);
     }
 
     /* -------------------------------------------------------------------------- */
@@ -885,14 +839,12 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
     /*                              Views & accounting                            */
     /* -------------------------------------------------------------------------- */
 
+    /// @notice Total depositor assets, excluding the curator bond.
+    /// @dev The bond is the curator's capital, not a depositor claim. `totalAssets` must never
+    ///      include it, or a depositor could redeem value the curator supplied.
     /// @inheritdoc ISkylineVault
     function totalAssets() public view returns (uint256) {
         return _assetsForLiquidity(depositorLiquidity);
-    }
-
-    /// @notice Total vault-side liquidity value, including the curator bond.
-    function _totalAssetsIncludingBond() internal view returns (uint256) {
-        return _assetsForLiquidity(depositorLiquidity) + curatorBondValue;
     }
 
     /// @notice NAV per share, scaled by 1e18.

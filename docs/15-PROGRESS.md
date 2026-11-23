@@ -34,7 +34,7 @@
 |---|---|
 | `src/SkylineHook.sol` | **The enforcement point.** Authoritative obligation ledger, shadow liquidity ledgers, the curator exit gate, the mandate (fee cap, tick band, minimum skin), the risk state. |
 | `src/SkylineBaseHook.sol` | A hand-written `IHooks` base against `v4-core@v4.0.0` (see `docs/16` §7). |
-| `src/SkylineVault.sol` | ERC-4626-style depositor accounting, the claim queue, the three-stage exit ladder, the curator bond, the performance fee, migration. |
+| `src/SkylineVault.sol` | ERC-4626-style depositor accounting, the claim queue, the three-stage exit ladder, the curator bond, the performance fee. |
 | `src/SkylineKeeper.sol` | Chainlink Automation-compatible keeper (`IAutomationCompatible`) that refreshes the risk regime and serves claims. Optional by construction. |
 | `src/libraries/SkylineTypes.sol` | Salts, the `Mandate`/`Claim`/`PoolConfig` structs, the settlement-tag encoding. |
 | `src/libraries/LiquidityAmounts.sol` | The standard Uniswap amount↔liquidity conversions. |
@@ -84,10 +84,10 @@ vault state for any deployment.
 | `updateRiskState` | Permissionless. High-water-mark reference price; failure-only escalation; `Breached` requires `BREACH_CONFIRMATIONS = 2` consecutive observations at ≥ 2× the drawdown limit. |
 | `effectiveRiskState` | Applies staleness: an oracle-configured pool that has never been evaluated, or whose evaluation is older than 1 hour, is `Restricted` for curator actions. Never read on a depositor path. |
 | Hook enforcement | `beforeAddLiquidity` rejects curator-salt additions when `effectiveRiskState >= Restricted`. Risk-reducing exits are unaffected. |
-| Vault enforcement | `curatorDeposit` and `performRebalance` revert `RiskStateRestricted`; `accruePerformanceFee` forfeits the fee and emits `PerformanceFeeForfeited` when `Breached`. |
+| Vault enforcement | `curatorDeposit` reverts `RiskStateRestricted`; `accruePerformanceFee` forfeits the fee and emits `PerformanceFeeForfeited` when `Breached`. |
 | `SkylineKeeper` | `IAutomationCompatible`. Reports work when the evaluation is stale or claims are outstanding; ignores `performData`; refreshes risk and settles claims best-effort. |
 
-**Verified:** `forge test` → **61 passed, 0 failed**. `forge build` clean. All 21 Chainlink tests
+**Verified:** `forge test` → **65 passed, 0 failed**. `forge build` clean. All 21 Chainlink tests
 pass, including a 10,000-run fuzz asserting that a depositor can register and settle a claim
 under every oracle failure mode.
 
@@ -142,15 +142,15 @@ under every oracle failure mode.
 - [x] 5.1 fee cap
 - [x] 5.2 tick band
 - [x] 5.3 minimum skin
-- [x] 5.4 `performRebalance` — band-checked, risk-gated; exercised by `Oracle.t.sol`
-- [ ] 5.5 `setMandate` tightening rules (not implemented; `setMandate` is owner-only, pre-liquidity)
+- [x] 5.4 ~~`performRebalance`~~ — **removed from the shipped surface**; the mandate fixes the pool and range
+- [ ] 5.5 `setMandate` tightening rules (not implemented; mandates are fixed at registration)
 - [ ] 5.6 `test/Mandate.t.sol` (the constraints are enforced but not individually tested)
 
-### Phase 6 — fee, forfeiture, migration, registry — **PARTIAL**
+### Phase 6 — fee, forfeiture, registry — **PARTIAL**
 - [x] 6.1 HWM performance fee
 - [x] 6.2 `accruePerformanceFee`
 - [x] 6.3 forfeiture on a detected drawdown breach — `accruePerformanceFee` detects `Breached`, forfeits, emits `PerformanceFeeForfeited`
-- [x] 6.4 `migrate` (implemented, **not tested**)
+- [x] 6.4 ~~`migrate`~~ — **removed from the shipped surface**; cross-vault migration is out of scope
 - [ ] 6.5 `CuratorRegistry`
 - [ ] 6.6 `test/Fee.t.sol`
 
@@ -210,7 +210,7 @@ under every oracle failure mode.
 | 3 | Demo clip is not recorded | The final submission | Record the 90-second scenario in `docs/11-DEMO.md` |
 | 4 | Keeper is deployed but not registered with Chainlink Automation | The "wired to Chainlink" claim | Register `SkylineKeeper` on Base Sepolia, or present it as an `IAutomationCompatible` keeper with a permissionless fallback |
 | 5 | No fork test against a live PoolManager | The strongest remaining proof | Write `test/fork/BaseSepolia.t.sol`; the scenario has been rehearsed manually on a Base Sepolia fork (§10.4) |
-| 6 | `performRebalance`, `migrate`, `accruePerformanceFee` have no focused unit tests | Confidence in Phase 5/6 | Write focused unit tests; `performRebalance` and fee forfeiture are exercised indirectly in `Oracle.t.sol` |
+| 6 | `accruePerformanceFee` has no focused unit test | Confidence in Phase 6 | Write a focused fee/forfeiture test |
 
 ---
 
@@ -279,7 +279,7 @@ deploy path, and 21 tests. Full suite: **61 passed, 0 failed**.
 
 - `Restricted` no longer freezes the curator's **exit**. Freezing an exit traps the curator's
   own capital and is a punishment, not a risk control. The regime now freezes only
-  *risk-increasing* actions (`curatorDeposit`, adds, `performRebalance`). This also resolves the
+  *risk-increasing* actions (`curatorDeposit`, adds). This also resolves the
   contradiction between `docs/05-SECURITY.md` §6 and `docs/10-CHAINLINK.md` §3.
 - The drawdown mark is the **Chainlink price against its own high-water mark**, not the vault's
   NAV. The NAV is an accounting output; using it as the risk input would let the curator move
@@ -416,7 +416,7 @@ state: `pendingLiquidity` `0`, curator liquidity `46,354,030,478`, and `riskStat
 
 - Two earlier attempts left abandoned vaults with idle USDC: `0xa1a89F00…82Ea2` and
   `0xF5650CE8…58a7b`. They are **not** part of the submission. Do not deposit into them or
-  migrate from them; the share price is polluted and the vault has no idle-balance sweep.
+  move funds from them; the share price is polluted and the vault has no idle-balance sweep.
 - The final position range is deliberately wide. A narrow range was pushed out of range by the
   bootstrap swap, after which deposits added zero liquidity.
 - `FOUNDRY_PROFILE=deploy` is required to keep the vendored PoolManager under EIP-170.
@@ -459,13 +459,13 @@ only when the depositor's own position provably cannot serve the claim.
 **Live deployment:** Base Sepolia still runs the pre-fix bytecode. Redeploy before recording if
 the deployment is meant to match the repository.
 
-**Periphery to cut or fix before submission:** `migrate` and `performRebalance` have no focused
-success-path tests. `migrate` burns shares against bond-inclusive assets while moving
-depositor-only assets, and its target-vault transfer has no allowance path. `performRebalance`
-removes both positions but re-adds only the depositor position, requires prior exit approval for
-the curator removal, and leaves the curator's proceeds idle with a stale `curatorBondValue`.
-Neither is on the demo path. The safest submission surface is the tested claim queue plus
-`curatorDeposit`; do not demo or advertise the other two until they are rewritten and tested.
+**Periphery removed:** `migrate` and `performRebalance` were removed from the shipped surface.
+`migrate` burned shares against bond-inclusive assets while moving depositor-only assets, and its
+target-vault transfer had no allowance path. `performRebalance` removed both positions but
+re-added only the depositor position, required prior exit approval for the curator removal, and
+left the curator's proceeds idle with a stale `curatorBondValue`. Neither was on the demo path.
+The mandate now fixes the pool and range; the curator can add bonded liquidity, not migrate the
+position. This is a smaller surface with a clearer security story, and the docs say so.
 
 ---
 

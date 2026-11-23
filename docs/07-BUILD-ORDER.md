@@ -177,8 +177,8 @@ src/
 | 5.1 | Fee cap in `_beforeSwap` (done in 1.5; add the mandate parameter) | |
 | 5.2 | Tick band check in `_beforeModifyLiquidity` for curator-salt modifications | Reverts `BelowBand` / `AboveBand` |
 | 5.3 | Minimum-skin projection check in `_beforeModifyLiquidity` | Reverts `SkinTooLow`; round **against** the curator |
-| 5.4 | `performRebalance` in the vault — moves both positions, respects the band, honours a per-epoch rebalance count | |
-| 5.5 | `setMandate` — curator may only tighten, never loosen, and only via a timelocked proposal | Simpler MVP: `onlyOwner` with a timelock, or curator-only tightening |
+| 5.4 | ~~`performRebalance`~~ — **removed from the shipped surface.** The mandate fixes the pool and range; the curator can add bonded liquidity, not migrate the position. | Code and docs now say so explicitly |
+| 5.5 | `setMandate` — curator may only tighten, never loosen, and only via a timelocked proposal | Not implemented; mandates are fixed at registration |
 | 5.6 | `test/Mandate.t.sol` — every violation path | |
 
 ### Acceptance criteria
@@ -189,7 +189,7 @@ src/
 
 ---
 
-## Phase 6 — Performance fee, forfeiture, migration (1 day)
+## Phase 6 — Performance fee, forfeiture, registry (1 day)
 
 ### Tasks
 
@@ -198,15 +198,14 @@ src/
 | 6.1 | High-water-mark performance fee, dilution-only | `docs/04-ECONOMICS.md` §7 |
 | 6.2 | `accruePerformanceFee()` — permissionless, call it before any withdrawal | |
 | 6.3 | Forfeiture on detected drawdown breach | `docs/05-SECURITY.md` §6 |
-| 6.4 | `migrate(assets, targetVault)` — single transaction, fee settlement | Differentiator vs. the nearest competitor |
+| 6.4 | ~~`migrate(assets, targetVault)`~~ — **removed from the shipped surface.** Cross-vault migration is out of scope. | Avoids an untested asset path |
 | 6.5 | `CuratorRegistry` — registration, `recordAbsorbed`, `recordFees` | Publishes, never punishes |
-| 6.6 | `test/Fee.t.sol`, `test/Migration.t.sol` | |
+| 6.6 | `test/Fee.t.sol` | |
 
 ### Acceptance criteria
 
 - [ ] The HWM never decreases; recovery from a drawdown pays no fee — invariant-tested
 - [ ] Fee shares are dilution-only; the curator cannot withdraw principal
-- [ ] Migration moves assets and settles fees in one transaction
 
 ---
 
@@ -271,7 +270,7 @@ Phase 0 ─► 1 ─► 2 ─► 3 ─► 4 ─► 5 ─► 6 ─► 7 ─► 8 
 **If you are running out of time, cut in this order** (each cut is survivable; the reverse is not):
 
 1. Phase 7 (Chainlink) — reduce to a single price-feed read, or drop and say so honestly
-2. Phase 6 migration — drop `migrate()`
+2. Phase 6 migration — already removed from the shipped surface
 3. Phase 5 tick band — keep the fee cap only
 4. Phase 8 dashboard — reduce to a static read-only view of pool state
 5. Phase 4 loss absorption — **last resort**; the exit gate alone still tells the story

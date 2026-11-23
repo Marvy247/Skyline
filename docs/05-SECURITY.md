@@ -51,7 +51,6 @@ claim and the implementation exactly aligned.
 | `vault.requestWithdraw` | Share balance, claim TTL, per-depositor limits | |
 | `vault.settleClaims` | Permissionless, FIFO, bounded per call | Anyone may trigger — good for liveness, bad for nothing |
 | `vault.requestCuratorExit` | Cooling-off, netting of `F` | |
-| `vault.performRebalance` | Band, cooldown, min-skin | Every rebalance passes through the hook's checks |
 | Oracle read | Only affects `riskState` | Never on the exit path (R4) |
 
 ---
@@ -190,7 +189,7 @@ mark of a careful protocol designer, and judges notice it.
 | A1: depositor registers a claim and never settles, locking the curator | Claims expire (`claimTtl`); shares are burned or reserved at registration so a fake claim costs real capital |
 | A2: depositor dust-spams claims to force constant settlement | Per-depositor open-claim limit (e.g. 3) and a minimum claim size |
 | A3: curator requests exit repeatedly to flip `curatorExitApproved` and probe state | Approval is idempotent and gated on `Q == 0`; add a per-epoch cooldown |
-| A4: curator triggers a rebalance to move price against the pool and then exits | The tick band + min-skin + exit lock make this unprofitable; also record a per-epoch rebalance count |
+| A4: curator adds liquidity at a range that moves the price against the pool and then exits | The committed tick band + min-skin + exit lock make this unprofitable |
 | A5: third party front-runs a claim | Claims are FIFO by `claimId`; front-running a *claim* does not jump the queue |
 | A6: someone calls `settleClaims` at a bad moment to crystallise a loss for the curator | Settlement is pro-rata and bounded; the shortfall rule is symmetric |
 | A7: oracle manipulation to trigger `Breached` and forfeit the curator's fees | Use a TWAP / multi-source mark; require the deviation to persist across N observations before escalating |

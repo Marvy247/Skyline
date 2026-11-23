@@ -252,10 +252,10 @@ remaining time before 3 December.
 |---|---|---|
 | `CuratorRegistry` (Phase 6) | **Not implemented.** The vault holds the curator address. | Low — the dashboard can read the curator from the vault |
 | `SkylineFactory` (Phase 6) | **Not implemented.** The deploy script wires the pieces directly. | Low |
-| `migrate()` between vaults | **Implemented** in the vault but **not tested**. | Medium |
+| `migrate()` between vaults | **Removed** from the shipped surface; cross-vault migration is out of scope. | — |
 | Chainlink integration (Phase 7) | **Implemented and tested**: `IChainlinkFeed`, `updateRiskState`, `effectiveRiskState`, risk-gated curator actions, `test/Oracle.t.sol` (21 tests). Wired to the Base Sepolia ETH/USD feed by the deploy script; not yet exercised against the live feed. | Done except live-feed verification |
 | Performance fee **forfeiture** on a detected drawdown breach | **Implemented.** `accruePerformanceFee` detects `Breached`, forfeits the epoch's fee, ratchets the HWM and emits `PerformanceFeeForfeited`. | Done |
-| `performRebalance` | **Implemented** and band/risk-gated; exercised indirectly by `Oracle.t.sol` but has no focused unit test. | Medium |
+| `performRebalance` | **Removed** from the shipped surface; the mandate fixes the pool and range. | — |
 | `mgmtFeeBps` | Declared, never used. | None — remove it |
 | Pro-rata third stage of the ladder | **Implemented** (`proRata` branch in `settleClaims`) but the branch is hard to reach and is not exercised by a test. | Low |
 | Fork tests against a live testnet PoolManager | **Not written.** | High if time permits — the strongest remaining proof |
@@ -400,7 +400,6 @@ conflict in favour of not trapping curator capital:
 | Depositor deposit / request / settle / pro-rata | allowed | allowed | allowed |
 | Curator **exit** (subject to the CEP gate) | allowed | **allowed** | **allowed** |
 | `curatorDeposit`, liquidity adds | allowed | **blocked** | **blocked** |
-| `performRebalance` | allowed | **blocked** | **blocked** |
 | Performance fee accrual | normal | normal | **forfeited** |
 
 The rationale: freezing an exit is not a risk control, it is a punishment, and it would trap the

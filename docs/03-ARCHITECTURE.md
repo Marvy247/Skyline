@@ -24,7 +24,7 @@ derived from an external mark.
 | # | Contract | Kind | Responsibility |
 |---|---|---|---|
 | 1 | `SkylineHook` | `BaseHook` | Owns the obligation ledger, the shadow-liquidity ledgers, the mandate, the risk state, the fee cap. **The only authority on ordering.** |
-| 2 | `SkylineVault` | ERC-4626-ish | Depositor accounting (shares, NAV), claims, settlement, curator bond accounting, performance fee, migration. Holds the two pool positions. |
+| 2 | `SkylineVault` | ERC-4626-ish | Depositor accounting (shares, NAV), claims, settlement, curator bond accounting, performance fee. Holds the two pool positions. |
 | 3 | `CuratorRegistry` | registry | Curator registration, mandate publication, bond address, fee recipients, reputation record (post-MVP). |
 | 4 | `SkylineFactory` | factory | Deploys a hook + vault pair per strategy pool, wires the manifest. |
 
@@ -462,7 +462,7 @@ Phase 5  loss absorption: shortfall → bond
    │
 Phase 6  mandate enforcement: fee cap, tick band, minimum skin
    │
-Phase 7  performance fee + forfeiture; migration
+Phase 7  performance fee + forfeiture
    │
 Phase 8  Chainlink risk state; Automation
    │

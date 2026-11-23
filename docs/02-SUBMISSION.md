@@ -166,7 +166,6 @@ curator's capital to depositor withdrawal obligations.
 | Curated LP networks (depositors follow managers) | Depositors follow a curator whose capital is bonded and subordinated to them |
 | Hooks that auto-rebalance via oracle triggers | Chainlink-sourced risk regime freezes risk-increasing curator operations in `Restricted`/`Breached`; a stale feed restricts rather than relaxes |
 | Performance fees | High-water-mark performance fee, dilution-only, forfeited on a confirmed drawdown breach |
-| Strategy migration between pools | Single-transaction migration with fee settlement |
 | **Curator Exit Parity (new)** | **Bonded curator capital, hook-enforced exit priority, loss absorption** |
 
 ---

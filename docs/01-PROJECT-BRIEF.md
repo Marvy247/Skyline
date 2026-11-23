@@ -199,7 +199,6 @@ No hook in the catalogue implements curator-bonded liquidity with depositor-prio
 - Three-stage exit ladder (see `04-ECONOMICS.md` §4) with a pro-rata last resort.
 - Mandate: fee cap, tick band, minimum skin, max drawdown → risk states.
 - Performance fee with high-water mark, dilution-only, forfeitable on mandate violation.
-- Strategy migration between vaults (single-transaction, fee settlement).
 - Dashboard with live on-chain state and the demo scenario.
 - Chainlink price feed for risk regime; Chainlink Automation for settlement (optional).
 

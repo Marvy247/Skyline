@@ -155,14 +155,13 @@ function curatorExitProceeds() external view returns (uint256);   // bondValue â
 ### 2.4 Strategy functions
 
 ```solidity
-function performRebalance(
-    int24 tickLower, int24 tickUpper, uint128 targetLiquidity
-) external onlyCurator returns (bool);
-
-function setMandate(Mandate calldata m) external onlyCurator;   // subject to hook rules
+function curatorDeposit(uint256 assets) external onlyCurator returns (uint128 liquidityAdded);
 function accruePerformanceFee() external returns (uint256 feeShares);
-function migrate(uint256 assets, address targetVault) external onlyOwner returns (uint256);
 ```
+
+Range migration and cross-vault migration are **not** part of the shipped surface. The mandate
+fixes the pool and the range; the curator can add bonded liquidity, not move the strategy to a
+different range or vault.
 
 ### 2.5 Views
 
@@ -256,7 +255,6 @@ struct Claim {
 | `nextClaimId` | `uint256` | |
 | `openClaimCount` | `uint256` | |
 | `lastCuratorExitRequest` | `uint64` | cooldown |
-| `rebalanceCount` | `mapping(uint64 => uint256)` | per-epoch count |
 
 ---
 
@@ -330,8 +328,7 @@ event CuratorExitRequested(address indexed curator, uint64 timestamp);
 event CuratorExited(address indexed curator, uint256 proceeds, uint256 shortfallNetted);
 event ShortfallAbsorbed(address indexed curator, uint256 amount, uint256 remainingShortfall);
 event PerformanceFeeAccrued(uint256 feeShares, uint256 hwm, uint256 navPerShare);
-event Rebalanced(int24 tickLower, int24 tickUpper, uint128 liquidity);
-event Migrated(address indexed to, uint256 assets, uint256 shares);
+event PerformanceFeeForfeited(uint256 hwm, uint256 navPerShare);
 ```
 
 `MandateViolation.violationCode` should be a `bytes32` enum so the dashboard can decode it

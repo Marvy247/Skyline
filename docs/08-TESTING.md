@@ -240,7 +240,6 @@ Record these in `docs/15-PROGRESS.md` and compare against the budget.
 | `vault.settleClaims` (1 claim) | < 400k |
 | `hook.registerClaim` | < 90k |
 | curator removal attempt (reverts) | < 60k |
-| `vault.performRebalance` | < 350k |
 
 A revert that costs more than ~80k gas is unpleasant for the demo (it looks expensive). If the
 gate is expensive, move the cheap check earlier in `beforeRemoveLiquidity`.
