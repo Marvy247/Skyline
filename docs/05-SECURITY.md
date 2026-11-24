@@ -50,7 +50,7 @@ claim and the implementation exactly aligned.
 | `hook.beforeSwap` | Fee cap | `fee <= mandate.maxFeeBps` |
 | `vault.requestWithdraw` | Share balance, claim TTL, per-depositor limits | |
 | `vault.settleClaims` | Permissionless, FIFO, bounded per call | Anyone may trigger — good for liveness, bad for nothing |
-| `vault.requestCuratorExit` | Cooling-off, netting of `F` | |
+| `vault.requestCuratorExit` | Cooling-off, then `hook.approveCuratorExit`; the hook requires an empty ledger | The vault cannot approve itself past the obligation ledger |
 | Oracle read | Only affects `riskState` | Never on the exit path (R4) |
 
 ---
