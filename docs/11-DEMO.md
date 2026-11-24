@@ -296,8 +296,8 @@ the replay on a fork, the live seed stays intact for Demo Day.
 Starting state: `totalAssets` `7,873,683` (7.873683 USDC), `totalSupply` `8,066,599`, NAV
 `0.976084592775716259`, `pendingLiquidity` `0`, depositor liquidity `364,160,580,020`, curator
 liquidity `46,536,901,550`, curator bond value `1,000,000`, risk `Normal`. The demo depositor
-holds `5.000000` shares; the curator holds the other `3.066599`. The contracts hold depositor and
-curator capital in separate v4 positions; the gate does not care who owns the depositor shares.
+holds `5.000000` depositor shares; the deployer holds the other `3.066599`. The curator bond is a
+**separate** v4 position, not vault shares. The gate does not care who owns the depositor shares.
 
 ### 9.2 Replay on a fork (leaves the live seed untouched)
 
@@ -332,6 +332,42 @@ Do **not** run step 5 on the live deployment before Demo Day: it consumes the se
 bond. For the 90-second clip, stop after step 4, or run the whole sequence on the fork and show
 the live dashboard only for the current state. The decoded-revert interaction can also be shown
 from `?scenario=blocked`, which is the same component tree with the fixture's numbers.
+
+### 9.4 Pre-flight on the live deployment
+
+Run these immediately before recording. The keeper refresh is permissionless and only affects
+the mandate badge; the exit gate is independent of it.
+
+```bash
+cd contracts
+set -a; . ./.env; set +a
+
+# 1. Refresh the risk evaluation so the mandate panel shows Normal for the next hour.
+cast send 0x50932de3B04d26910D32ab10654acEecC0Ce5B07 'performUpkeep(bytes)' 0x \
+  --private-key "$DEPLOYER_PRIVATE_KEY" --rpc-url "$BASE_SEPOLIA_RPC_URL"
+
+# 2. Confirm the seed is pristine.
+H=0x2B263944982CE27D9C90429C6ccf61B0c37c0f80
+V=0xDF5C0a4a4aC83D34EdB73DF3CF3Ca804a49B759F
+P=0x5ca84e8f59283a8d9dc4d23ead5f0528735d790f336a01df84bdc80262ceae38
+cast call $H 'pendingLiquidity(bytes32)(int128)' $P --rpc-url "$BASE_SEPOLIA_RPC_URL"   # 0
+cast call $H 'isCuratorExitBlocked(bytes32)(bool)' $P --rpc-url "$BASE_SEPOLIA_RPC_URL" # false
+cast call $H 'curatorExitApproved(bytes32)(bool)' $P --rpc-url "$BASE_SEPOLIA_RPC_URL"  # false
+cast call $V 'balanceOf(address)(uint256)' 0xc96d811952e6f87EFd0ddEDa3b85fe30F768AB5A \
+  --rpc-url "$BASE_SEPOLIA_RPC_URL"                                                     # 5000000
+```
+
+**Retakes.** Each settlement permanently serves `2.5` of the demo wallet's `5.0` shares and
+removes the matching assets from the pool. The demo wallet supports **one clean take, then one
+more**; after that it has no shares. If you need a third take, transfer shares from the curator
+(`0x27A2…`, holds `3.066599`) or redeploy. Rehearse the clicks on a fork before the live take.
+
+Start the dashboard with the production build so the live env is baked in:
+
+```bash
+cd dashboard
+npm run build && npm run start -- -p 3001   # http://localhost:3001/dashboard
+```
 
 ---
 

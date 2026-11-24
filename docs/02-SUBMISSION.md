@@ -256,12 +256,12 @@ manager's capital to the people whose capital they manage.
 
 The pool uses fee `3000` and tick spacing `60`, with the strategy range at `196020..208080`.
 The vault is seeded with a curator bond and two depositor positions: the demo depositor
-`0xc96d811952e6f87EFd0ddEDa3b85fe30F768AB5A` holds `5.000000` shares, and the curator
-`0x27A2dD1823D883935c9824fbaC0a018cE8e891E5` holds the remaining `3.066599`. At deployment the
-stored `riskState` is `Normal`; `effectiveRiskState` is `Normal` while the keeper's evaluation is
-fresh and degrades to `Restricted` once it is more than an hour old, by design. The curator exit
-gate is closed only by the obligation ledger. The machine-readable artifact is
-`contracts/deployments/84532.json`; the deploy block is `62913856`.
+`0xc96d811952e6f87EFd0ddEDa3b85fe30F768AB5A` holds `5.000000` depositor shares, and the deployer
+holds the remaining `3.066599`. The curator bond is a **separate** v4 position, not vault shares.
+At deployment the stored `riskState` is `Normal`; `effectiveRiskState` is `Normal` while the
+keeper's evaluation is fresh and degrades to `Restricted` once it is more than an hour old, by
+design. The curator exit gate is closed only by the obligation ledger. The machine-readable
+artifact is `contracts/deployments/84532.json`; the deploy block is `62913856`.
 
 | Field | Value |
 |---|---|
