@@ -224,13 +224,33 @@ contract SkylineHook is SkylineBaseHook, ISkylineHook {
     }
 
     /// @inheritdoc ISkylineHook
+    /// @dev Mandates are immutable once a pool carries liquidity, EXCEPT that the owner may
+    ///      always TIGHTEN one: lower the fee cap, narrow the tick band, raise the minimum skin,
+    ///      lower the drawdown tolerance or shorten the claim TTL. Loosening requires an empty
+    ///      pool, so a curator can never be granted more room after depositors have arrived.
     function setMandate(PoolId poolId, SkylineTypes.Mandate calldata m) external onlyOwner {
         if (!_poolConfigs[poolId].registered) revert PoolNotRegistered();
-        if (curatorLiquidity[poolId] != 0 || depositorLiquidity[poolId] != 0) revert InvalidMandate();
         _validateMandate(m);
 
-        _mandates[poolId] = m;
-        emit MandateUpdated(poolId, m);
+        SkylineTypes.Mandate memory old = _mandates[poolId];
+        bool hasLiquidity = curatorLiquidity[poolId] != 0 || depositorLiquidity[poolId] != 0;
+
+        if (hasLiquidity) {
+            // Tightening only. Every field must move in the more restrictive direction.
+            if (m.maxFeeBps > old.maxFeeBps) revert InvalidMandate();
+            if (m.bandLower < old.bandLower) revert InvalidMandate();
+            if (m.bandUpper > old.bandUpper) revert InvalidMandate();
+            if (m.minSkinBps < old.minSkinBps) revert InvalidMandate();
+            if (m.maxDrawdownBps > old.maxDrawdownBps) revert InvalidMandate();
+            if (m.claimTtl > old.claimTtl) revert InvalidMandate();
+        }
+
+        // The risk state is managed by `updateRiskState`, not by mandate edits.
+        SkylineTypes.Mandate memory nm = m;
+        nm.riskState = old.riskState;
+
+        _mandates[poolId] = nm;
+        emit MandateUpdated(poolId, nm);
     }
 
     /// @inheritdoc ISkylineHook

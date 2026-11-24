@@ -68,7 +68,7 @@ Depositors exit through **claims**, not a direct redeem:
 The mandate — fee cap, tick band, minimum skin, claim TTL and drawdown limit — is committed at
 pool registration and enforced by the same hook at the point of action. `Restricted` and
 `Breached` risk states freeze **risk-increasing** curator actions only; exits and every depositor
-action remain available.
+action remain available. Mandates may only be **tightened** once a pool carries liquidity.
 
 ## Why the hook is load-bearing
 
@@ -87,6 +87,14 @@ curator and withdrawal twice:
 That is the honest claim: CEP changes **who leaves first and what the curator owes**, not the
 depositor's exposure to the market. The depositor was always exposed to the strategy; they were
 never supposed to be exposed to the curator's head start.
+
+### The no-bypass argument
+
+Because the position owner is part of the position key and is set to `msg.sender` at the
+PoolManager, only the owner can modify its position; because the PoolManager is the only way to
+modify liquidity and hooks run on every modification, no execution path removes curator-bonded
+liquidity without passing through the hook's gate. The vault is a client of the PoolManager, not
+its owner.
 
 ## What the hook prevents, detects and refuses to do
 
@@ -115,11 +123,12 @@ derivable from pool state.
 
 | Component | State |
 |---|---|
-| Contracts | Implemented and tested — **67 tests, 0 failed** (39 core unit + 21 Chainlink/keeper + 7 invariants) |
+| Contracts | Implemented and tested — **80 tests, 0 failed** (39 core unit + 21 Chainlink/keeper + 7 invariants + 5 performance-fee + 5 mandate + 3 fork) |
 | Invariants | 7 invariants at **2,000 runs × 100,000 calls**, 0 reverts |
 | Dashboard | Next.js 15 + wagmi/viem — six tabs, live reads, decoded reverts, no-network demo fixture |
 | Deployment | Base Sepolia (84532), canonical v4 PoolManager, real USDC/WETH, live Chainlink ETH/USD feed |
 | Formatting | `forge fmt --check` clean; dashboard `tsc --noEmit` clean |
+| Fork tests | Pass against the live Base Sepolia deployment (`test/fork/BaseSepolia.t.sol`) |
 
 ## Repository map
 
@@ -130,11 +139,23 @@ derivable from pool state.
 | [`contracts/src/SkylineKeeper.sol`](contracts/src/SkylineKeeper.sol) | Chainlink Automation-compatible keeper (optional by construction) |
 | [`contracts/test/unit/Counterfactual.t.sol`](contracts/test/unit/Counterfactual.t.sol) | With-CEP vs without-CEP ordering — the load-bearing proof |
 | [`contracts/test/invariant/Cep.t.sol`](contracts/test/invariant/Cep.t.sol) | The stateful invariant suite |
+| [`contracts/test/fork/BaseSepolia.t.sol`](contracts/test/fork/BaseSepolia.t.sol) | Fork tests against the live deployment |
 | [`dashboard/`](dashboard/) | The demo dashboard |
 | [`docs/02-SUBMISSION.md`](docs/02-SUBMISSION.md) | The submission text |
 | [`docs/04-ECONOMICS.md`](docs/04-ECONOMICS.md) | CEP formalisation and the exit ladder |
 | [`docs/16-IMPLEMENTATION-NOTES.md`](docs/16-IMPLEMENTATION-NOTES.md) | **Every place the code diverged from the spec, and why** |
 | [`docs/15-PROGRESS.md`](docs/15-PROGRESS.md) | Living status log and handover notes |
+
+## Dashboard
+
+The dashboard is the demo surface. It reads the hook's own state and reports whether Curator
+Exit Parity holds (`verifyCep`), rather than recomputing it.
+
+![CEP badge and overview](docs/screenshots/overview-blocked.png)
+
+![Exit gate showing the blocked curator exit](docs/screenshots/exit-gate-blocked.png)
+
+![Last-resort defensive bond branch](docs/screenshots/overview-lastresort.png)
 
 ## Quick start
 
@@ -143,8 +164,11 @@ derivable from pool state.
 cd contracts
 ./bootstrap.sh                                        # pinned deps: forge-std, OZ, v4-core, solmate
 forge build
-forge test                                            # 67 tests
+forge test                                            # 80 tests
 FOUNDRY_PROFILE=ci forge test --match-path "test/invariant/Cep.t.sol"   # 10,000 runs
+
+# Fork tests against the live deployment
+forge test --match-path "test/fork/BaseSepolia.t.sol" --fork-url https://sepolia.base.org
 
 # Dashboard
 cd ../dashboard
@@ -160,6 +184,23 @@ with `script/Inspect.s.sol`; the exact cast commands are in `docs/11-DEMO.md` §
 `FOUNDRY_PROFILE=deploy` is required for deployment: at the 1,000,000-run default the vendored
 `PoolManager` exceeds EIP-170 (see `docs/16` §14.3). `contracts/lib` is not committed;
 `bootstrap.sh` installs the exact pinned set.
+
+## Verify on-chain
+
+```bash
+cast call 0x2B263944982CE27D9C90429C6ccf61B0c37c0f80 \
+  "verifyCep(bytes32)(bool,int128,int128,bool)" \
+  0x5ca84e8f59283a8d9dc4d23ead5f0528735d790f336a01df84bdc80262ceae38 \
+  --rpc-url https://sepolia.base.org
+
+cast call 0x2B263944982CE27D9C90429C6ccf61B0c37c0f80 \
+  "verifyCuratorBond(bytes32)(int128,int128)" \
+  0x5ca84e8f59283a8d9dc4d23ead5f0528735d790f336a01df84bdc80262ceae38 \
+  --rpc-url https://sepolia.base.org
+```
+
+Both return the hook's own view of its invariants. Anyone can run them; no trust in this
+repository is required.
 
 ## Documentation
 
