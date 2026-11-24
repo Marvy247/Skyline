@@ -246,21 +246,22 @@ manager's capital to the people whose capital they manage.
 | Contract | Address |
 |---|---|
 | v4 PoolManager (canonical) | `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408` |
-| SkylineHook | `0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80` |
-| SkylineVault | `0x51d200C87e05a4c3E13460E6F0D46977be2622C9` |
-| SkylineKeeper | `0x708C227792F969d62206E4d76603Aa1d1b9C5796` |
-| PoolId | `0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b` |
+| SkylineHook | `0x2B263944982CE27D9C90429C6ccf61B0c37c0f80` |
+| SkylineVault | `0xDF5C0a4a4aC83D34EdB73DF3CF3Ca804a49B759F` |
+| SkylineKeeper | `0x50932de3B04d26910D32ab10654acEecC0Ce5B07` |
+| PoolId | `0x5ca84e8f59283a8d9dc4d23ead5f0528735d790f336a01df84bdc80262ceae38` |
 | USDC (currency0) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 | WETH (currency1) | `0x4200000000000000000000000000000000000006` |
 | Chainlink ETH/USD | `0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1` |
 
 The pool uses fee `3000` and tick spacing `60`, with the strategy range at `196020..208080`.
-The vault is seeded with a curator bond and two depositor positions. At the time of writing,
-the stored `riskState` is `Normal`; `effectiveRiskState` is `Normal` while the keeper's
-evaluation is fresh and degrades to `Restricted` once it is more than an hour old, by design.
-The curator exit gate is closed only by the obligation ledger, and the keeper's
-`performUpkeep` has been exercised on-chain. The machine-readable artifact is
-`contracts/deployments/84532.json`.
+The vault is seeded with a curator bond and two depositor positions: the demo depositor
+`0xc96d811952e6f87EFd0ddEDa3b85fe30F768AB5A` holds `5.000000` shares, and the curator
+`0x27A2dD1823D883935c9824fbaC0a018cE8e891E5` holds the remaining `3.066599`. At deployment the
+stored `riskState` is `Normal`; `effectiveRiskState` is `Normal` while the keeper's evaluation is
+fresh and degrades to `Restricted` once it is more than an hour old, by design. The curator exit
+gate is closed only by the obligation ledger. The machine-readable artifact is
+`contracts/deployments/84532.json`; the deploy block is `62913856`.
 
 | Field | Value |
 |---|---|
@@ -271,7 +272,7 @@ The curator exit gate is closed only by the obligation ledger, and the keeper's
 | Integrations | Uniswap v4 (PoolManager, Hooks, StateLibrary), Chainlink (Price Feeds + Automation), Foundry |
 | Repo | **https://github.com/Marvy247/Skyline** |
 | Demo video | `TODO` — 90-second clip, before 30 November |
-| Deployed addresses | **Base Sepolia (84532)** — Hook `0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80` · Vault `0x51d200C87e05a4c3E13460E6F0D46977be2622C9` · PoolId `0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b` |
+| Deployed addresses | **Base Sepolia (84532)** — Hook `0x2B263944982CE27D9C90429C6ccf61B0c37c0f80` · Vault `0xDF5C0a4a4aC83D34EdB73DF3CF3Ca804a49B759F` · PoolId `0x5ca84e8f59283a8d9dc4d23ead5f0528735d790f336a01df84bdc80262ceae38` |
 | Team | **Marvy247** |
 | Track priority | Uniswap Prize (title sponsor) + Chainlink Prize + General Prize |
 

@@ -14,15 +14,15 @@
 
 | Field | Value |
 |---|---|
-| **Phase** | Phase 9 — redeploy with final bytecode; demo clip/submission fields in progress |
-| **Last updated** | 23 November 2026 |
+| **Phase** | Phase 10 — final deployment live on Base Sepolia; demo clip and submission fields in progress |
+| **Last updated** | 24 November 2026 |
 | **Idea submission deadline** | 16 November 2026 — **passed; submission status unconfirmed** |
 | **Final submission deadline** | 3 December 2026 |
 | **Demo Day** | 11 December 2026 |
 | **Contracts** | **implemented and tested** — 67 tests green (39 core unit + 21 Chainlink/keeper + 7 invariants); fresh-clone bootstrap verified |
 | **Dashboard** | **complete** — typechecks, builds warning-free, ABI aligned; live Base Sepolia reads verified against the deployment |
-| **Deployment** | Base Sepolia (84532) runs **pre-fix bytecode**; a fresh deployment with the final contracts is pending USDC funding |
-| **Blocking issues** | UHI11 sponsor list unverified; demo clip not recorded; redeploy pending |
+| **Deployment** | **Base Sepolia (84532) runs the final build** — hook `0x2B26…0f80`, vault `0xDF5C…759F`; seeded and verified (§13) |
+| **Blocking issues** | UHI11 sponsor list unverified; demo clip not recorded |
 
 ---
 
@@ -213,7 +213,7 @@ under every oracle failure mode.
 | 2 | The Nov 16 idea-submission portal is not located | Submitting on time | Get the real form from the announcement |
 | 3 | Demo clip is not recorded | The final submission | Record the 90-second scenario in `docs/11-DEMO.md` |
 | 4 | Keeper is deployed but not registered with Chainlink Automation | The "wired to Chainlink" claim | Register `SkylineKeeper` on Base Sepolia, or present it as an `IAutomationCompatible` keeper with a permissionless fallback |
-| 5 | No fork test against a live PoolManager | The strongest remaining proof | Write `test/fork/BaseSepolia.t.sol`; the scenario has been rehearsed manually on a Base Sepolia fork (§10.4) |
+| 5 | No automated fork test against a live PoolManager | The strongest remaining proof | A manual end-to-end rehearsal against a live fork of the canonical PoolManager passed (§13.1); optionally promote it to `test/fork/BaseSepolia.t.sol` |
 | 6 | `accruePerformanceFee` has no focused unit test | Confidence in Phase 6 | Write a focused fee/forfeiture test |
 
 ---
@@ -345,7 +345,10 @@ fields. No Base Sepolia RPC URL or funded deployer key is available in the envir
 client-side decoding bugs found by pointing it at the deployment), and two deploy-script fixes
 found by running the real deployment. The full demo path was rehearsed on a Base Sepolia fork.
 
-### 10.1 Live deployment — Base Sepolia (84532)
+### 10.1 Live deployment — Base Sepolia (84532) — **historical, superseded by §13**
+
+> This deployment runs the pre-fix bytecode and its assets were consumed. It is kept here as a
+> record; do not use these addresses.
 
 | Item | Value |
 |---|---|
@@ -399,7 +402,9 @@ deployment: the context strip shows the real hook/vault/pool, the CEP badge read
 NAV/share renders `0.9803`, the mandate tab shows the correct `0.300%` fee cap, 10% skin and 10%
 drawdown limit, and all six tabs render without a wallet.
 
-### 10.4 Live-path rehearsal on a Base Sepolia fork
+### 10.4 Live-path rehearsal on a Base Sepolia fork — historical
+
+> This rehearsal ran against the pre-fix deployment. The final build's rehearsal is §13.1.
 
 The whole demo path was executed against an anvil fork of Base Sepolia (chain id 84532,
 `--auto-impersonate`), so the live deployment was not mutated:
@@ -412,9 +417,8 @@ The whole demo path was executed against an anvil fork of Base Sepolia (chain id
 | `requestCuratorExit()` | approved by the hook |
 | `curatorExit(46,354,030,478)` | succeeded; curator liquidity → `0`; proceeds `998,040` (0.99804 USDC) |
 
-This is the exact sequence for the 90-second clip. The live deployment is back at its seeded
-state: `pendingLiquidity` `0`, curator liquidity `46,354,030,478`, and `riskState` `Normal`;
-`effectiveRiskState` is `Normal` immediately after a keeper refresh.
+This was the exact sequence for the 90-second clip on the pre-fix deployment. The final build's
+sequence and values are in §13.1.
 
 ### 10.5 Deployment traps
 
@@ -460,8 +464,8 @@ only when the depositor's own position provably cannot serve the claim.
 
 **Suite:** 65 tests, 0 failures; 7 invariants at 2,000 runs × 100,000 calls.
 
-**Live deployment:** Base Sepolia still runs the pre-fix bytecode. Redeploy before recording if
-the deployment is meant to match the repository.
+**Live deployment at that point:** Base Sepolia still ran the pre-fix bytecode. *(Superseded by
+§13 — the final build was deployed on 24 November.)*
 
 **Periphery removed:** `migrate` and `performRebalance` were removed from the shipped surface.
 `migrate` burned shares against bond-inclusive assets while moving depositor-only assets, and its
@@ -504,8 +508,56 @@ every 2 hours, per address/chain. Seed sizes for the arriving balance: 20 → 10
 20/12/8, 60+ → 30/18/12 (depositor A / depositor B / curator bond). The pool also needs WETH;
 the deployer holds ~0.0078 WETH and the old deployment can return ~0.0022 more.
 
-**Still blocked:** the redeploy itself, until the USDC arrives. The old deployment runs
-pre-fix bytecode and is drained; do not record against it.
+**Resolved 24 Nov:** the Circle faucet delivered 20 USDC; the final deployment is in §13. The old
+deployment runs pre-fix bytecode and is drained; do not record against it.
+
+---
+
+## 13. Final deployment — session of 24 November 2026
+
+**The repository's final build is live on Base Sepolia (84532).** The deploy used the real
+deployer key and the exact seed geometry rehearsed on a fork; every predicted address matched.
+
+| Item | Value |
+|---|---|
+| v4 PoolManager (canonical) | `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408` |
+| SkylineHook | `0x2B263944982CE27D9C90429C6ccf61B0c37c0f80` |
+| SkylineVault | `0xDF5C0a4a4aC83D34EdB73DF3CF3Ca804a49B759F` |
+| SkylineKeeper | `0x50932de3B04d26910D32ab10654acEecC0Ce5B07` |
+| PoolId | `0x5ca84e8f59283a8d9dc4d23ead5f0528735d790f336a01df84bdc80262ceae38` |
+| Deploy block | `62913856` |
+| Curator / fee recipient | `0x27A2dD1823D883935c9824fbaC0a018cE8e891E5` |
+| Demo depositor | `0xc96d811952e6f87EFd0ddEDa3b85fe30F768AB5A` |
+
+Seed: bootstrap liquidity `8e12`, depositor A `5 USDC`, depositor B `3 USDC`, curator bond
+`1 USDC`. The deploy left `1.762420` USDC and `0.001776259875219344` WETH with the deployer.
+
+**Live state at deployment:** `totalAssets` `7,873,683`; `totalSupply` `8,066,599`; NAV
+`0.976084592775716259`; demo depositor shares `5,000,000`; depositor liquidity
+`364,160,580,020`; curator liquidity `46,536,901,550`; curator bond value `1,000,000`;
+`pendingLiquidity` `0`; `isCuratorExitBlocked` `false`; `effectiveRiskState` `Normal`.
+
+### 13.1 Full demo-path rehearsal on a Base Sepolia fork
+
+Same deployer, same nonce (`109`), same salt and code, so the fork predicted the live addresses
+exactly. The rehearsal ran the complete recording path and left the live seed untouched.
+
+| Step | Result |
+|---|---|
+| Demo depositor `requestWithdraw(2,500,000)` | claim `#0`; pending `112,860,603,472`; blocked `true` |
+| Curator `requestCuratorExit()` | revert `CuratorExitBlocked(112860603472)`, selector `0xb2f9ec04` |
+| `settleClaims(10)` | paid `2,432,727` USDC; pending `0`; blocked `false` |
+| Curator `requestCuratorExit()` | approved `true` |
+| Fork-only `curatorExit(46,536,901,550)` | proceeds `1,002,902`; curator liquidity `0`; bond `0`; shortfall `0` |
+
+The gap between `assetsOwed` `2,440,211` and `assetsPaid` `2,432,727` is market/execution loss
+borne by the shares, not charged to the bond. That is the intended semantics.
+
+**Verified:** `forge test` → **67 passed, 0 failed**; `forge fmt --check` clean; dashboard
+`tsc --noEmit` clean; `npm run build` clean.
+
+**Remaining:** record the 90-second clip, add the video link to `docs/02-SUBMISSION.md`, and
+optionally verify on BaseScan (needs `BASESCAN_API_KEY`).
 
 ---
 

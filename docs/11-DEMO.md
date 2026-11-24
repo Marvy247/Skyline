@@ -244,12 +244,17 @@ Plan for the failure.
 
 ## 8. Recording a 90-second clip (needed by 30 Nov)
 
-Record against the **live Base Sepolia dashboard**, connected to the wallet that holds the seeded
-shares. The live deployment is at its initial state: `pendingLiquidity` `0`, claim queue empty,
-`curatorExitApproved` false. The keeper was refreshed at 16:23 UTC on 23 November; its evaluation
-is fresh for one hour. After that, `effectiveRiskState` is `Restricted` — the badge still says
-CEP is enforced, and depositor exits still work. Refresh the keeper if the mandate panel's
-`Restricted` label would distract.
+Record against the **live Base Sepolia dashboard**, connected to the demo wallet that holds the
+seeded shares. The live deployment is at its initial state: `pendingLiquidity` `0`, claim queue
+empty, `curatorExitApproved` false. The keeper's evaluation is fresh for one hour from deployment.
+Before recording, call `SkylineKeeper.performUpkeep(0x)` — permissionless, costs a few cents of
+testnet ETH — so the mandate panel shows `Normal` rather than the deliberate `Restricted` stale
+state. Depositor exits and the exit gate are unaffected either way.
+
+The recording needs **two wallet accounts**: the demo depositor
+`0xc96d811952e6f87EFd0ddEDa3b85fe30F768AB5A` (holds `5.000000` shares) and the curator
+`0x27A2dD1823D883935c9824fbaC0a018cE8e891E5`. `requestCuratorExit` is `onlyCurator`, so switch
+MetaMask to the curator for the blocked-exit shot.
 
 **Do not call `curatorExit`.** The last step only requests the vault's exit approval. Calling
 `curatorExit` on the live deployment consumes the seeded curator bond before Demo Day.
@@ -257,18 +262,18 @@ CEP is enforced, and depositor exits still work. Refresh the keeper if the manda
 | Time | Tab / action | What the viewer sees |
 |---|---|---|
 | 0:00–0:06 | Overview | Title card or the CEP badge: **Curator Exit Parity: ENFORCED** |
-| 0:06–0:12 | Connect wallet | The seeded address and its 4.03 shares |
-| 0:12–0:24 | Claims → `0.5` → Request | Claim `#0` appears; `pendingLiquidity` becomes `22,690,688,424` |
-| 0:24–0:36 | Exit gate → Attempt curator exit | **`CuratorExitBlocked(22690688424)`**, decoded in plain English |
+| 0:06–0:12 | Connect demo wallet | The seeded address and its `5.000000` shares |
+| 0:12–0:24 | Claims → `2.5` → Request | Claim `#0` appears; `pendingLiquidity` becomes `112,860,603,472` |
+| 0:24–0:36 | Switch to curator → Exit gate → Attempt curator exit | **`CuratorExitBlocked(112860603472)`**, decoded in plain English |
 | 0:36–0:44 | "Why is it blocked?" | The hook's ledger, not the vault's opinion; not a timelock |
-| 0:44–0:56 | Claims → Settle claims | Claim settles FIFO; `pendingLiquidity` returns to `0` |
+| 0:44–0:56 | Claims → Settle claims | Claim settles FIFO; `pendingLiquidity` returns to `0`; `2.432727` USDC paid |
 | 0:56–1:08 | Exit gate → Attempt curator exit | This time it succeeds: the vault grants exit approval |
 | 1:08–1:20 | Verification | Raw hook state: pending `0`, `curatorExitBlocked` false |
 | 1:20–1:30 | Overview / close | One line: **the curator cannot run** |
 
 Record at 1920×1080, no audio needed, no cursor jitter. **This is the submission's demo link.**
 The exact cast commands, selectors and expected values are in §9.2; the rehearsal transcript is
-in `docs/15-PROGRESS.md` §10.4.
+in `docs/15-PROGRESS.md` §13.
 
 ---
 
@@ -281,17 +286,18 @@ the replay on a fork, the live seed stays intact for Demo Day.
 
 | Item | Value |
 |---|---|
-| Hook | `0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80` |
-| Vault | `0x51d200C87e05a4c3E13460E6F0D46977be2622C9` |
-| Keeper | `0x708C227792F969d62206E4d76603Aa1d1b9C5796` |
-| PoolId | `0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b` |
-| Curator / sole share holder | `0x27A2dD1823D883935c9824fbaC0a018cE8e891E5` |
+| Hook | `0x2B263944982CE27D9C90429C6ccf61B0c37c0f80` |
+| Vault | `0xDF5C0a4a4aC83D34EdB73DF3CF3Ca804a49B759F` |
+| Keeper | `0x50932de3B04d26910D32ab10654acEecC0Ce5B07` |
+| PoolId | `0x5ca84e8f59283a8d9dc4d23ead5f0528735d790f336a01df84bdc80262ceae38` |
+| Demo depositor | `0xc96d811952e6f87EFd0ddEDa3b85fe30F768AB5A` |
+| Curator / deployer | `0x27A2dD1823D883935c9824fbaC0a018cE8e891E5` |
 
-Starting state: `totalAssets` `3,951,074` (3.951074 USDC), `totalSupply` `4,030,216`, NAV
-`0.980362839113337845`, `pendingLiquidity` `0`, depositor liquidity `182,896,908,595`, curator
-liquidity `46,354,030,478`. The testnet seed uses one key for both roles for funding convenience;
-the contracts still hold the depositor and curator capital in separate v4 positions, and the
-hook does not care who owns the shares.
+Starting state: `totalAssets` `7,873,683` (7.873683 USDC), `totalSupply` `8,066,599`, NAV
+`0.976084592775716259`, `pendingLiquidity` `0`, depositor liquidity `364,160,580,020`, curator
+liquidity `46,536,901,550`, curator bond value `1,000,000`, risk `Normal`. The demo depositor
+holds `5.000000` shares; the curator holds the other `3.066599`. The contracts hold depositor and
+curator capital in separate v4 positions; the gate does not care who owns the depositor shares.
 
 ### 9.2 Replay on a fork (leaves the live seed untouched)
 
@@ -300,28 +306,30 @@ hook does not care who owns the shares.
 anvil --fork-url "$BASE_SEPOLIA_RPC_URL" --chain-id 84532 --port 8546 --auto-impersonate
 
 # Terminal 2 — use the same cast commands against http://127.0.0.1:8546
-V=0x51d200C87e05a4c3E13460E6F0D46977be2622C9
-H=0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80
-P=0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b
-D=0x27A2dD1823D883935c9824fbaC0a018cE8e891E5
+V=0xDF5C0a4a4aC83D34EdB73DF3CF3Ca804a49B759F
+H=0x2B263944982CE27D9C90429C6ccf61B0c37c0f80
+P=0x5ca84e8f59283a8d9dc4d23ead5f0528735d790f336a01df84bdc80262ceae38
+D=0xc96d811952e6f87EFd0ddEDa3b85fe30F768AB5A   # demo depositor
+C=0x27A2dD1823D883935c9824fbaC0a018cE8e891E5   # curator
 R=http://127.0.0.1:8546
 ```
 
 | Step | Command | Expected |
 |---|---|---|
-| 1 | `cast send $V 'requestWithdraw(uint256)' 500000 --from $D --unlocked --rpc-url $R` | claim 0; `pendingLiquidity` `22,690,688,424`; `isCuratorExitBlocked` `true` |
-| 2 | `cast send $V 'requestCuratorExit()' --from $D --unlocked --rpc-url $R` | revert `CuratorExitBlocked(22690688424)` |
-| 3 | `cast send $V 'settleClaims(uint256)' 10 --from $D --unlocked --rpc-url $R` | claim settled; pending `0`; blocked `false` |
-| 4 | `cast send $V 'requestCuratorExit()' --from $D --unlocked --rpc-url $R` | approved |
-| 5 | `cast send $V 'curatorExit(uint128)' 46354030478 --from $D --unlocked --rpc-url $R` | curator liquidity `0`; proceeds `998,040` (0.99804 USDC) |
+| 1 | `cast send $V 'requestWithdraw(uint256)' 2500000 --from $D --unlocked --rpc-url $R` | claim 0; `pendingLiquidity` `112,860,603,472`; `isCuratorExitBlocked` `true` |
+| 2 | `cast send $V 'requestCuratorExit()' --from $C --unlocked --rpc-url $R` | revert `CuratorExitBlocked(112860603472)` |
+| 3 | `cast send $V 'settleClaims(uint256)' 10 --from $D --unlocked --rpc-url $R` | claim settled; `2.432727` USDC paid; pending `0`; blocked `false` |
+| 4 | `cast send $V 'requestCuratorExit()' --from $C --unlocked --rpc-url $R` | approved |
+| 5 | `cast send $V 'curatorExit(uint128)' 46536901550 --from $C --unlocked --rpc-url $R` | curator liquidity `0`; proceeds `1,002,902` (1.002902 USDC) |
 
 Step 2 is the shot. The error selector is `0xb2f9ec04` (`CuratorExitBlocked(int128)`) and the
-argument is the outstanding obligation — the hook's own ledger, not the vault's opinion.
+argument is the outstanding obligation — the hook's own ledger, not the vault's opinion. In the
+dashboard, connect the demo wallet for steps 1 and 3, and the curator for steps 2 and 4.
 
 ### 9.3 If you record against the live deployment
 
 Do **not** run step 5 on the live deployment before Demo Day: it consumes the seeded curator
-bond. For the 90-second clip, stop after step 3, or run the whole sequence on the fork and show
+bond. For the 90-second clip, stop after step 4, or run the whole sequence on the fork and show
 the live dashboard only for the current state. The decoded-revert interaction can also be shown
 from `?scenario=blocked`, which is the same component tree with the fixture's numbers.
 

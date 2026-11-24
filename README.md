@@ -10,10 +10,19 @@ withdrawals**. It is not another vault, yield strategy or copy-trading product: 
 is an **exit-ordering guarantee** enforced inside the hook, at the PoolManager, where no vault,
 router or keeper can route around it.
 
-**Live on Base Sepolia (84532).** The final hook, vault, keeper and `PoolId` are written by the
-deploy script to [`contracts/deployments/84532.json`](contracts/deployments/84532.json). The
-dashboard in [`dashboard/`](dashboard/) reads the same values from `dashboard/.env.local`. The
-90-second demo script is [`docs/11-DEMO.md`](docs/11-DEMO.md).
+**Live on Base Sepolia (84532).**
+
+| Contract | Address |
+|---|---|
+| SkylineHook | `0x2B263944982CE27D9C90429C6ccf61B0c37c0f80` |
+| SkylineVault | `0xDF5C0a4a4aC83D34EdB73DF3CF3Ca804a49B759F` |
+| SkylineKeeper | `0x50932de3B04d26910D32ab10654acEecC0Ce5B07` |
+| PoolId | `0x5ca84e8f59283a8d9dc4d23ead5f0528735d790f336a01df84bdc80262ceae38` |
+
+The deploy script writes the same values to
+[`contracts/deployments/84532.json`](contracts/deployments/84532.json), and the dashboard in
+[`dashboard/`](dashboard/) reads them from `dashboard/.env.local`. The 90-second demo script is
+[`docs/11-DEMO.md`](docs/11-DEMO.md).
 
 ---
 
