@@ -142,7 +142,7 @@ src/
 
 ---
 
-## Phase 4 — Curator exit + loss absorption (1 day)
+## Phase 4 — Curator exit + last-resort drawdown (1 day)
 
 **Goal:** the full exit ladder, end to end.
 
@@ -151,18 +151,19 @@ src/
 | # | Task | Notes |
 |---|---|---|
 | 4.1 | `requestCuratorExit()` — curator-only, cooling-off, calls `hook.approveCuratorExit` | Emit `CuratorExitRequested` |
-| 4.2 | `settleClaims` — extend to the three-stage ladder: depositor liquidity → curator bond → pro-rata last resort | `docs/04-ECONOMICS.md` §3 |
-| 4.3 | Track `uncoveredShortfall` in token units; net it from curator exit proceeds | `docs/04-ECONOMICS.md` §5 |
-| 4.4 | Curator exit payout = `bondValue − uncoveredShortfall` | |
+| 4.2 | `settleClaims` — depositor liquidity first; defensive last-resort bond drawdown; pro-rata/expiry fallback | `docs/04-ECONOMICS.md` §3 |
+| 4.3 | Track `uncoveredShortfall` in token units as bond value delivered to depositors; do not slash market losses | `docs/04-ECONOMICS.md` §5 |
+| 4.4 | Curator exit payout = the live value of the remaining bond | No double netting |
 | 4.5 | `test/ExitLadder.t.sol` — the full worked example from `docs/04-ECONOMICS.md` §5, asserted number by number | **This test is the demo's script** |
 | 4.6 | `test/invariant/NoLockout.t.sol` — INV-6 | Fuzz ≥ 10,000 runs |
 
 ### Acceptance criteria
 
 - [ ] The worked example reproduces exactly: 55,556 → blocked → settled → permitted
-- [ ] The shortfall case reproduces exactly: 90,000 claim, 80,000 available, 10,000 absorbed by the bond
+- [ ] Normal claim maths keeps `Q ≤ D`; the last-resort branch is defensive and bounded
+- [ ] A market loss between registration and settlement stays with the depositor's shares
 - [ ] **No reachable state leaves a depositor unable to exit** — invariant-tested
-- [ ] The curator's exit proceeds are netted by any uncovered shortfall — invariant-tested
+- [ ] The curator's exit proceeds are the live remaining bond, with no double netting
 
 ---
 
@@ -273,7 +274,7 @@ Phase 0 ─► 1 ─► 2 ─► 3 ─► 4 ─► 5 ─► 6 ─► 7 ─► 8 
 2. Phase 6 migration — already removed from the shipped surface
 3. Phase 5 tick band — keep the fee cap only
 4. Phase 8 dashboard — reduce to a static read-only view of pool state
-5. Phase 4 loss absorption — **last resort**; the exit gate alone still tells the story
+5. Phase 4 last-resort drawdown — **defensive branch**; the exit gate alone still tells the story
 
 **Never cut:** Phase 2 (the claim ledger), the exit gate in Phase 4, Phase 9.1–9.3 (a live
 deployment and a demo clip).

@@ -124,7 +124,9 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
     /// @notice Performance fee, in bps.
     uint16 public perfFeeBps;
 
-    /// @notice Uncovered claim amount charged to the curator, in asset units.
+    /// @notice Bond value delivered to depositors in the last-resort path, in asset units.
+    /// @dev A historical accountability counter, not a live liability. The value left the
+    ///      curator's position when the bond liquidity was removed.
     uint256 public uncoveredShortfall;
     /// @notice The curator's bond claim, in asset units.
     uint256 public curatorBondValue;
@@ -168,8 +170,8 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
     event ClaimCancelled(address indexed depositor, uint256 indexed claimId, uint256 sharesRestored);
     event CuratorBonded(address indexed curator, uint256 assets, uint128 liquidityAdded);
     event CuratorExitRequested(address indexed curator, uint64 timestamp);
-    event CuratorExited(address indexed curator, uint256 proceeds, uint256 shortfallNetted);
-    event ShortfallAbsorbed(address indexed curator, uint256 amount, uint256 remainingShortfall);
+    event CuratorExited(address indexed curator, uint256 proceeds);
+    event BondShortfallDelivered(address indexed curator, uint256 amount, uint256 deliveredToDate);
     event PerformanceFeeAccrued(uint256 feeShares, uint256 hwm, uint256 navPerShare);
     event PerformanceFeeForfeited(uint256 hwm, uint256 navPerShare);
 
@@ -333,7 +335,8 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
     /// @notice Serves due claims, FIFO.
     /// @dev Permissionless. The three stages of the exit ladder are implemented here:
     ///      1. depositor liquidity serves the claim;
-    ///      2. the curator's bond absorbs any shortfall;
+    ///      2. the curator's bond supplies a last-resort shortfall only when depositor liquidity
+    ///         provably cannot cover the claim;
     ///      3. if total claims exceed total available liquidity, every open claim receives a
     ///         PRO-RATA share of what is left, so the first claimant cannot extract everything
     ///         while the others are left with nothing.
@@ -401,7 +404,7 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
             _removeLiquidity(SkylineTypes.LP_SALT, fromDepositor, tag);
         }
 
-        // --- Stage 2: the curator's bond absorbs the shortfall ---
+        // --- Stage 2: last resort — the bond supplies the shortfall if depositor liquidity cannot ---
         uint128 fromBond = take - fromDepositor;
         if (fromBond > 0) {
             _removeLiquidity(SkylineTypes.CURATOR_SALT, fromBond, tag);
@@ -409,7 +412,7 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
             uint256 consumed = received < curatorBondValue ? received : curatorBondValue;
             curatorBondValue -= consumed;
             uncoveredShortfall += consumed;
-            emit ShortfallAbsorbed(curator, consumed, uncoveredShortfall);
+            emit BondShortfallDelivered(curator, consumed, uncoveredShortfall);
         }
 
         // The removal returned both pool currencies. Depositors are paid in the vault's asset, so
@@ -426,16 +429,10 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
         }
 
         if (c.settledLiquidity >= c.liquidityAmount) {
-            // The strategy may have lost value between registration and settlement. Whatever the
-            // depositor was promised but did not receive is charged to the curator's bond: that is
-            // what "skin in the game" means.
-            if (c.assetsOwed > c.assetsPaid) {
-                uint256 shortfall = c.assetsOwed - c.assetsPaid;
-                uint256 consumed = shortfall < curatorBondValue ? shortfall : curatorBondValue;
-                curatorBondValue -= consumed;
-                uncoveredShortfall += consumed;
-                emit ShortfallAbsorbed(curator, consumed, uncoveredShortfall);
-            }
+            // A difference between `assetsOwed` and `assetsPaid` is a market loss between
+            // registration and settlement. It is borne by the shares that bore the risk, not
+            // charged to the curator's bond. The bond is exit-priority collateral, not
+            // market-loss insurance: the curator is not slashed because the pool moved.
             _closeClaim(c);
         } else {
             c.status = uint8(SkylineTypes.ClaimStatus.PartiallySettled);
@@ -527,10 +524,13 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
         return true;
     }
 
-    /// @notice Removes the curator's bonded liquidity and pays out the proceeds, netted by any
-    ///         uncovered shortfall.
+    /// @notice Removes the curator's bonded liquidity and pays out the proceeds.
+    /// @dev The curator is paid the gross proceeds of the position it is removing. A
+    ///      `uncoveredShortfall` is a record of bond value already delivered to depositors in
+    ///      the last-resort path; that value left the position when it was removed, so netting
+    ///      it again here would charge the curator twice.
     /// @param liquidity The liquidity to remove.
-    /// @return proceeds The net proceeds paid to the curator.
+    /// @return proceeds The proceeds paid to the curator.
     function curatorExit(uint128 liquidity) external onlyCurator nonReentrant returns (uint256 proceeds) {
         if (!curatorExitRequested) revert CoolingOff();
         if (liquidity > curatorLiquidity) revert InsufficientAssets();
@@ -548,10 +548,7 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
         uint256 otherReceived = other.balanceOf(address(this)) - otherBefore;
         if (otherReceived > 0) _swapExactInput(otherReceived, false);
 
-        uint256 gross = asset.balanceOf(address(this)) - balanceBefore;
-        uint256 netted = gross < uncoveredShortfall ? gross : uncoveredShortfall;
-        uncoveredShortfall -= netted;
-        proceeds = gross - netted;
+        proceeds = asset.balanceOf(address(this)) - balanceBefore;
 
         // The bond's recorded value is a cost basis, not a live mark. Remove it in proportion to
         // the liquidity that left, so a full exit clears it and a partial exit keeps the
@@ -562,7 +559,7 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
         asset.safeTransfer(msg.sender, proceeds);
         curatorExitRequested = false;
 
-        emit CuratorExited(curator, proceeds, netted);
+        emit CuratorExited(curator, proceeds);
     }
 
     /* -------------------------------------------------------------------------- */
@@ -883,8 +880,9 @@ contract SkylineVault is IUnlockCallback, ISkylineVault, ReentrancyGuard {
 
     /// @inheritdoc ISkylineVault
     function curatorExitProceeds() external view returns (uint256) {
-        uint256 gross = curatorBondValue;
-        return gross > uncoveredShortfall ? gross - uncoveredShortfall : 0;
+        // The live value of the remaining bond. A prior `uncoveredShortfall` already left the
+        // position when it was delivered to a depositor; it is not netted a second time.
+        return _assetsForLiquidity(curatorLiquidity);
     }
 
     /// @inheritdoc ISkylineVault

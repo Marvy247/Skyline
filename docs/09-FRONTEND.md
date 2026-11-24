@@ -95,7 +95,7 @@ dashboard/
 │   │   ├── exit-gate-panel.tsx     # ★ the demo centrepiece
 │   │   ├── exit-ladder.tsx         # the three-stage waterfall
 │   │   ├── claims-panel.tsx        # claim queue + request/settle (also exports VaultStatsPanel)
-│   │   ├── curator-bond-panel.tsx  # bond value, skin %, shortfall absorbed
+│   │   ├── curator-bond-panel.tsx  # bond value, skin %, last-resort deliveries
 │   │   ├── mandate-panel.tsx       # mandate parameters + enforcement model
 │   │   └── verifier-panel.tsx      # "anyone can check" panel
 │   └── landing/                    # re-written for Skyline
@@ -180,7 +180,7 @@ Three scenarios, switchable by query parameter:
 | URL | Scenario |
 |---|---|
 | `/dashboard?scenario=blocked` | A claim is outstanding; the curator's exit is **blocked** (default) |
-| `/dashboard?scenario=absorption` | The curator's bond **absorbs** a 10,000-unit shortfall |
+| `/dashboard?scenario=lastresort` | The defensive last-resort branch: depositor liquidity provably cannot cover the claim; the bond supplies the remainder, bounded by the shortfall |
 | `/dashboard?scenario=settled` | Obligations are settled; the curator's exit is **permitted** |
 
 **This is the Demo Day contingency.** If the public RPC is slow, the wallet misbehaves, or the
@@ -199,7 +199,7 @@ In demo mode the curator-exit action **simulates the revert** and renders the de
 | **Overview** | CEP badge · exit ladder · vault stats · claim queue | The 15-second read |
 | **Exit gate** | CEP badge · **exit gate panel** · exit ladder | The demo |
 | **Claims** | Vault stats · claim queue | The depositor's view |
-| **Curator bond** | Bond value, skin meter, absorbed shortfall, top-up | The skin in the game |
+| **Curator bond** | Bond value, skin meter, last-resort deliveries, top-up | The skin in the game |
 | **Mandate** | Mandate parameters, enforcement model | The authority |
 | **Verification** | Independent verification + raw hook state | "Anyone can check" |
 

@@ -4,7 +4,8 @@
  * Curator bond panel — the skin in the game.
  *
  * Shows the curator's bonded liquidity, the resulting skin ratio against the
- * mandate minimum, and the shortfall the bond has absorbed so far.
+ * mandate minimum, and any bond value delivered to depositors in the
+ * last-resort branch.
  */
 
 import { motion } from "framer-motion"
@@ -26,7 +27,7 @@ export function CuratorBondPanel({
   const actions = useMandateActions()
 
   const belowMinimum = derived.skinBps < state.mandate.minSkinBps
-  const absorbed = state.uncoveredShortfall > 0n
+  const delivered = state.uncoveredShortfall > 0n
 
   return (
     <Panel>
@@ -62,10 +63,10 @@ export function CuratorBondPanel({
             tone={belowMinimum ? "red" : "emerald"}
           />
           <StatTile
-            label="Absorbed shortfall"
+            label="Delivered to depositors"
             value={formatUnits(state.uncoveredShortfall, 6)}
-            hint={absorbed ? "USDC charged to the curator" : "none"}
-            tone={absorbed ? "amber" : "neutral"}
+            hint={delivered ? "USDC, last-resort branch" : "none"}
+            tone={delivered ? "amber" : "neutral"}
           />
         </div>
 
@@ -95,17 +96,17 @@ export function CuratorBondPanel({
         <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
           <KeyValue label="Exit proceeds if the curator exits now" value={`${formatUnits(state.curatorExitProceeds, 6)} USDC`} mono />
           <KeyValue
-            label="Netting"
+            label="Deduction at exit"
             value={
               state.uncoveredShortfall > 0n
-                ? "proceeds reduced by the uncovered shortfall"
-                : "no netting applied"
+                ? "none — the delivered value already left the position"
+                : "none"
             }
           />
           <KeyValue label="Minimum skin" value={formatBps(state.mandate.minSkinBps)} mono />
         </div>
 
-        {absorbed ? (
+        {delivered ? (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -115,13 +116,13 @@ export function CuratorBondPanel({
               <TrendingDown className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
               <div>
                 <p className="text-sm font-bold text-amber-900">
-                  The curator&apos;s bond absorbed the shortfall
+                  The bond supplied a last-resort shortfall
                 </p>
                 <p className="mt-1 text-sm leading-relaxed text-amber-800">
-                  Depositor liquidity could not cover the outstanding claims on its own. The
-                  curator&apos;s bonded capital took the difference — {formatUnits(state.uncoveredShortfall, 6)}{" "}
-                  USDC — and the curator&apos;s exit proceeds are netted by it. This is the
-                  mechanism working as designed.
+                  Depositor liquidity provably could not cover the obligation. The bond supplied the
+                  remainder — {formatUnits(state.uncoveredShortfall, 6)} USDC — and it went to the
+                  depositor. The remaining bond is paid out in full; the same value is not deducted
+                  twice, and a market loss is never charged here.
                 </p>
               </div>
             </div>

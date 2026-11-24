@@ -11,11 +11,14 @@
 
 ## 1. The scenario, in one paragraph
 
-A curator has posted $20,000 of bonded capital into a Uniswap v4 pool alongside $80,000 of
-depositor capital. The strategy has degraded 8%. Alice requests a withdrawal. The hook records
-the obligation and immediately locks the curator's exit. The curator tries to leave. **The hook
-rejects it.** Claims settle from depositor liquidity; where that is insufficient, the curator's
-bond absorbs the shortfall. Only then may the curator exit — netted by whatever it still owes.
+A curator has posted bonded capital into a Uniswap v4 pool alongside depositor capital. The
+strategy has degraded 8%. Alice requests a withdrawal. The hook records the obligation and
+immediately locks the curator's exit. The curator tries to leave. **The hook rejects it.**
+Claims settle from depositor liquidity while the curator remains locked. If depositor liquidity
+cannot cover an obligation, the bond supplies the remainder, bounded by the shortfall. A market
+loss between registration and settlement is borne by depositor shares — the curator is not
+slashed because the pool moved. Only after the queue clears may the curator exit with the
+remaining bond.
 
 ---
 
@@ -99,16 +102,20 @@ Say, once, clearly:
 
 Pause. Let it land. Do not talk over it.
 
-### 4:00–4:40 — Who absorbs the loss
+### 4:00–4:40 — Who bears the loss
 
 Switch to **Overview**. Point at the exit ladder.
 
 > "And when the claims settle, here's where the money comes from. Depositor liquidity first.
-> Then the curator's bonded capital — because they can't extract what depositors are owed. Then
-> pro rata, so a depositor is never locked out.
+> The curator's bond stays locked behind the claim — they can't extract what depositors are owed.
+> Only if depositor liquidity provably cannot cover an obligation does the bond supply the
+> remainder, bounded by the shortfall.
 >
-> The asymmetry is the product: the curator's downside is bigger than a depositor's, and that is
-> priced into the curator's fee."
+> A market loss is different. That is borne by the shares that bore the risk. The curator is not
+> slashed because the pool moved — locking is not slashing.
+>
+> The asymmetry is the product: the curator cannot leave first, and that is priced into the
+> curator's fee."
 
 ### 4:40–5:00 — Close
 
@@ -122,11 +129,13 @@ Switch to **Overview**. Point at the exit ladder.
 
 ## 4. Backup beats (only if you have time or the demo breaks)
 
-**Beat A — the bond absorbs the shortfall.** Open `?scenario=absorption`.
+**Beat A — the last-resort bond drawdown.** Open `?scenario=lastresort` if the fixture is
+available.
 
-> "When depositor liquidity can't cover the claims, the curator's capital absorbs the difference.
-> Ten thousand units of shortfall, taken out of the curator's bond, and their exit proceeds are
-> netted by it."
+> "If depositor liquidity provably cannot cover an obligation, the hook allows the bond to be
+> drawn down by exactly the shortfall — no more. The proceeds go to the depositor, and the
+> position is reduced by what it paid. It is a backstop, not a general escape hatch, and it is
+> not triggered by a market loss."
 
 **Beat B — the mandate.** Open **Mandate** tab.
 
@@ -159,10 +168,10 @@ Switch to **Overview**. Point at the exit ladder.
 > every modification. There is no route that skips it. We assert this in the test suite."
 
 **"What if the curator refuses to cooperate?"**
-> "They don't have to. The bond position is held by the vault, so the vault can serve claims
-> from it without the curator's permission — bounded by the shortfall, and only when depositor
-> liquidity provably cannot cover the claims. The curator's exit proceeds are netted by whatever
-> is still owed."
+> "They don't have to. The bond position is held by the vault, so the vault can serve an
+> obligation from it without the curator's permission — bounded by the shortfall, and only when
+> depositor liquidity provably cannot cover the claim. A market loss is not charged to the bond;
+> that would be slashing, and locking is not slashing."
 
 **"What stops the curator from manipulating the price to trigger a loss?"**
 > "The tick band and minimum skin constrain their position changes, and the exit lock means they
@@ -190,9 +199,10 @@ Switch to **Overview**. Point at the exit ladder.
 > capital. Skyline's entire mechanism is about the curator's exit, not the depositor's."
 
 **"What if the claims can never be settled?"**
-> "There's a pro-rata last resort: if depositor liquidity and the curator's bond together still
-> can't cover the claims, everything is released pro rata and the uncovered amount becomes a
-> receivable against the curator. A depositor is never locked out. That's an invariant we assert."
+> "The settlement loop serves claims FIFO and falls back to pro-rata if total claims ever exceed
+> available liquidity. After the claim's TTL, anyone can expire it; the unserved shares return to
+> the depositor, so nothing is permanently stuck. The worst case is a partial payout, not a
+> lockout."
 
 **"What about multi-pool strategies?"**
 > "Out of scope for the MVP — one pool per vault. The ledger is keyed by `PoolId`, so the

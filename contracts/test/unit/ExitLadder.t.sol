@@ -16,7 +16,7 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
  *
  *      The ladder:
  *        1. depositor liquidity serves the claim;
- *        2. the curator's bond absorbs the shortfall;
+ *        2. the curator's bond is locked behind the claim, and is a last-resort backstop;
  *        3. pro rata, so a depositor is never locked out.
  */
 contract ExitLadderTest is SkylineFixture {
@@ -79,10 +79,11 @@ contract ExitLadderTest is SkylineFixture {
         assertEq(vault.curatorLiquidity(), curatorLiq, "the curator's position must be untouched");
     }
 
-    /// @notice The strategy degrades, the depositor is underpaid, and the curator's bond covers
-    ///         the difference. This is the loss-absorption beat.
-    function test_workedExample_bondAbsorbsTheShortfall() public {
+    /// @notice A market loss between registration and settlement is borne by the depositor's
+    ///         shares, not charged to the curator's bond. The bond stays locked in the pool.
+    function test_workedExample_marketLossStaysWithTheDepositor() public {
         seedScenario();
+        uint256 bondBefore = vault.curatorBondValue();
 
         // The strategy degrades: the pool price falls, so the position's value in the vault's
         // asset falls with it.
@@ -101,21 +102,15 @@ contract ExitLadderTest is SkylineFixture {
         vault.settleClaims(10);
 
         (,,,, uint256 paid,,,) = vault.claims(0);
-        assertLt(paid, owed, "the depositor must be underpaid after a degradation");
+        assertLt(paid, owed, "the depositor bears the market loss");
 
-        // The difference is charged to the curator's bond.
-        uint256 absorbed = vault.uncoveredShortfall();
-        assertGt(absorbed, 0, "the curator's bond must absorb the shortfall");
-        assertGe(absorbed, owed - paid, "the bond must cover the whole shortfall");
+        // The difference is not a curator penalty. The depositor's shares carried the price risk;
+        // the bond is exit-priority collateral, not market-loss insurance.
+        assertEq(vault.uncoveredShortfall(), 0, "a market loss must not be charged to the bond");
+        assertEq(vault.curatorBondValue(), bondBefore, "the bond must be untouched");
 
-        // And the curator's exit proceeds are netted by it: the curator does not get to walk away
-        // with the full bond after the strategy cost its depositors money.
-        assertLt(vault.curatorExitProceeds(), vault.curatorBondValue(), "the exit proceeds must be netted");
-        assertEq(
-            vault.curatorExitProceeds(),
-            vault.curatorBondValue() - vault.uncoveredShortfall(),
-            "the exit proceeds must be the bond less the shortfall"
-        );
+        // The curator can still realise the bond, but only after the claim has cleared.
+        assertGt(vault.curatorExitProceeds(), 0, "the bond remains realisable");
     }
 
     /// @notice Stage 1: depositor liquidity serves the claim first.
@@ -142,24 +137,24 @@ contract ExitLadderTest is SkylineFixture {
         assertLt(vault.uncoveredShortfall() * 10_000 / owed, 50, "there must be no material shortfall");
     }
 
-    /// @notice Stage 2: the curator's bond absorbs a shortfall.
-    function test_stageTwo_bondAbsorbsTheShortfall() public {
+    /// @notice Stage 2 is a last-resort branch: a market loss alone does not move the bond.
+    function test_stageTwo_marketLossDoesNotConsumeTheBond() public {
         seedScenario();
 
         // Degrade the strategy so the position is worth less than it was.
         movePrice(true, 300_000e18);
 
+        uint256 bondBefore = vault.curatorBondValue();
         uint256 aliceShares = vault.balanceOf(alice);
         vm.prank(alice);
         vault.requestWithdraw(aliceShares);
 
-        uint256 bondBefore = vault.curatorBondValue();
         vault.settleClaims(10);
 
-        // The bond's VALUE is consumed. The position itself only shrinks when the curator exits,
-        // which is exactly the point: the curator cannot take the capital out while it is owed.
-        assertLt(vault.curatorBondValue(), bondBefore, "the curator's bond must be consumed");
-        assertGt(vault.uncoveredShortfall(), 0, "the shortfall must be recorded");
+        // The depositor's own liquidity was enough to serve the claim. The loss stays with the
+        // shares that bore it; the bond is not a market-loss fund.
+        assertEq(vault.curatorBondValue(), bondBefore, "a market loss must not consume the bond");
+        assertEq(vault.uncoveredShortfall(), 0, "no bond value is delivered in this path");
     }
 
     /// @notice Stage 3: a depositor is never locked out, even when the pool cannot cover them.

@@ -4,8 +4,8 @@
  * The exit ladder.
  *
  * A three-stage visual of where a depositor's withdrawal is served from, and
- * who absorbs the loss at each stage. It is the fastest way to explain the
- * economic asymmetry to a judge who has never heard of Skyline.
+ * what each stage is for. It is the fastest way to explain the economic
+ * asymmetry to a judge who has never heard of Skyline.
  */
 
 import { motion } from "framer-motion"
@@ -35,8 +35,8 @@ export function ExitLadder({
 }) {
   const servedByDepositors = pending < depositorLiquidity ? pending : depositorLiquidity
   const shortfall = pending > depositorLiquidity ? pending - depositorLiquidity : 0n
-  const absorbedByBond = shortfall < curatorLiquidity ? shortfall : curatorLiquidity
-  const proRata = shortfall > absorbedByBond ? shortfall - absorbedByBond : 0n
+  const bondLastResort = shortfall < curatorLiquidity ? shortfall : curatorLiquidity
+  const remainder = shortfall > bondLastResort ? shortfall - bondLastResort : 0n
 
   const stages: Stage[] = [
     {
@@ -50,21 +50,21 @@ export function ExitLadder({
     },
     {
       key: "bond",
-      title: "2 · Curator bond",
+      title: "2 · Curator bond — last resort",
       source: "the curator's own bonded position",
-      amount: absorbedByBond,
+      amount: bondLastResort,
       tone: "amber",
       icon: ShieldAlert,
-      note: "Where depositor liquidity is insufficient, the curator's capital absorbs the loss. This is skin in the game with teeth.",
+      note: "Only if depositor liquidity provably cannot cover the obligation. The bond supplies at most the shortfall, and the proceeds go to the depositor. A market loss is not charged to it.",
     },
     {
       key: "proRata",
-      title: "3 · Pro-rata last resort",
-      source: "all remaining liquidity, shared",
-      amount: proRata,
+      title: "3 · Pro-rata / expiry fallback",
+      source: "remaining claims, shared",
+      amount: remainder,
       tone: "red",
       icon: Scale,
-      note: "If even the bond is exhausted, everything is released pro rata. A depositor is never locked out — liveness is guaranteed.",
+      note: "Any remainder is served pro rata across remaining claims. After the claim's TTL anyone can expire it and restore the unserved shares. A depositor is never locked out.",
     },
   ]
 
@@ -145,10 +145,12 @@ export function ExitLadder({
         Outstanding obligation:{" "}
         <span className="font-bold text-slate-800">{formatLiquidity(pending)} liquidity units</span> ·
         served from depositor liquidity{" "}
-        <span className="font-bold text-slate-800">{formatLiquidity(servedByDepositors)}</span> ·
-        absorbed by the curator bond{" "}
-        <span className="font-bold text-amber-700">{formatLiquidity(absorbedByBond)}</span> · pro-rata{" "}
-        <span className="font-bold text-red-700">{formatLiquidity(proRata)}</span>
+        <span className="font-bold text-slate-800">{formatLiquidity(servedByDepositors)}</span> · bond
+        last resort{" "}
+        <span className="font-bold text-amber-700">{formatLiquidity(bondLastResort)}</span>{" "}
+        · pro-rata remainder{" "}
+        <span className="font-bold text-red-700">{formatLiquidity(remainder)}</span>. A market loss
+        between request and settlement stays with shares; the bond is untouched.
       </p>
     </div>
   )

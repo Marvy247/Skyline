@@ -14,15 +14,15 @@
 
 | Field | Value |
 |---|---|
-| **Phase** | Phase 9 — live Base Sepolia deployment **DONE**; demo clip/submission fields in progress |
+| **Phase** | Phase 9 — redeploy with final bytecode; demo clip/submission fields in progress |
 | **Last updated** | 23 November 2026 |
 | **Idea submission deadline** | 16 November 2026 — **passed; submission status unconfirmed** |
 | **Final submission deadline** | 3 December 2026 |
 | **Demo Day** | 11 December 2026 |
-| **Contracts** | **implemented and tested** — 65 tests green (37 core unit + 21 Chainlink/keeper + 7 invariants); fresh-clone bootstrap verified |
+| **Contracts** | **implemented and tested** — 67 tests green (39 core unit + 21 Chainlink/keeper + 7 invariants); fresh-clone bootstrap verified |
 | **Dashboard** | **complete** — typechecks, builds warning-free, ABI aligned; live Base Sepolia reads verified against the deployment |
-| **Deployment** | **live on Base Sepolia (84532)** — canonical v4 PoolManager, real USDC/WETH, live Chainlink ETH/USD feed; `riskState` `Normal`, `effectiveRiskState` degrades to `Restricted` if the keeper evaluation is more than 1h old, by design; keeper `performUpkeep` exercised on-chain |
-| **Blocking issues** | UHI11 sponsor list unverified; demo clip not recorded |
+| **Deployment** | Base Sepolia (84532) runs **pre-fix bytecode**; a fresh deployment with the final contracts is pending USDC funding |
+| **Blocking issues** | UHI11 sponsor list unverified; demo clip not recorded; redeploy pending |
 
 ---
 
@@ -48,8 +48,9 @@
 |---|---|---|
 | `unit/Primitives.t.sol` | 8 | The v4 mechanics the design rests on: position keying, salt separation, owner-only modification, shadow-counter accuracy, deposit pricing |
 | `unit/ClaimLedger.t.sol` | 17 | The ledger, the exit gate (both the approval refusal and the removal block), approval revocation, expiry, claim limits |
-| `unit/ExitLadder.t.sol` | 8 | **The demo script.** Stage 1/2/3, the worked example, liveness |
-| `unit/ClaimAccounting.t.sol` | 4 | Share reservation, full settlement, bond-shortfall settlement, permissionless expiry |
+| `unit/ExitLadder.t.sol` | 8 | **The demo script.** Depositor-first settlement, market-loss semantics, the worked example, liveness |
+| `unit/ClaimAccounting.t.sol` | 4 | Share reservation, full settlement with burns, expiry, permissionless cancel |
+| `unit/Counterfactual.t.sol` | 2 | With-CEP vs without-CEP ordering — the load-bearing proof |
 | `Oracle.t.sol` | 21 | Chainlink risk regime: every feed failure mode, HWM ratchet, breach confirmation, keeper, fuzzed INV-5 |
 | `invariant/Cep.t.sol` | 7 invariants | INV-1 … INV-6 plus shadow-counter and over-settlement checks. 2,000 runs × 100,000 calls, 0 reverts |
 | `utils/SkylineFixture.sol` | — | Deploys PoolManager, tokens, hook (etched onto a permission-correct address), pool, vault; registers the pool; seeds the bootstrap position |
@@ -87,7 +88,7 @@ vault state for any deployment.
 | Vault enforcement | `curatorDeposit` reverts `RiskStateRestricted`; `accruePerformanceFee` forfeits the fee and emits `PerformanceFeeForfeited` when `Breached`. |
 | `SkylineKeeper` | `IAutomationCompatible`. Reports work when the evaluation is stale or claims are outstanding; ignores `performData`; refreshes risk and settles claims best-effort. |
 
-**Verified:** `forge test` → **65 passed, 0 failed**. `forge build` clean. All 21 Chainlink tests
+**Verified:** `forge test` → **67 passed, 0 failed**. `forge build` clean. All 21 Chainlink tests
 pass, including a 10,000-run fuzz asserting that a depositor can register and settle a claim
 under every oracle failure mode.
 
@@ -130,11 +131,11 @@ under every oracle failure mode.
 - [x] 3.7 claim expiry → share restore
 - [x] 3.8 `test/Vault.t.sol` → folded into `ClaimLedger.t.sol` / `ExitLadder.t.sol`
 
-### Phase 4 — curator exit + loss absorption — **DONE**
+### Phase 4 — curator exit + last-resort drawdown — **DONE**
 - [x] 4.1 `requestCuratorExit`
-- [x] 4.2 the three-stage ladder
+- [x] 4.2 depositor liquidity first, then the defensive last-resort branch
 - [x] 4.3 `uncoveredShortfall` (denominated in the asset — see `docs/16` §3)
-- [x] 4.4 netted exit proceeds
+- [x] 4.4 exit proceeds = the live value of the remaining bond (no double netting)
 - [x] 4.5 `test/ExitLadder.t.sol` — **the demo's script**
 - [x] 4.6 `test/invariant/Cep.t.sol` — INV-6
 
@@ -188,7 +189,7 @@ under every oracle failure mode.
 | 11 Nov | Claims are liquidity-denominated, per-`PoolId` | Partial settlement is natural; cross-pool lockout is impossible |
 | 11 Nov | Curator and depositor capital are **two positions** (`salt`) | Without separation the exit ladder cannot be executed or audited |
 | 11 Nov | The ledger is decremented **inside `afterRemoveLiquidity`** | Strictly stronger: no decrement without real liquidity leaving |
-| 11 Nov | Loss absorption is denominated in the **asset**, not liquidity units | A liquidity-unit shortfall is impossible by construction; the real loss is a value loss |
+| 11 Nov | Shortfalls are denominated in the **asset**, not liquidity units | A liquidity-unit shortfall is impossible by construction; the real difference is a value loss. *(Bond semantics revised 23 Nov — see §12: the bond is exit-priority collateral, not market-loss insurance.)* |
 | 11 Nov | The oracle is never on the depositor exit path | A stale feed must never trap depositor capital |
 | 11 Nov | Pro-rata last resort guarantees liveness | A depositor must never be locked out |
 | 11 Nov | Hook base written by hand against `v4-core@v4.0.0` | The published `uniswap-hooks` package targets a newer core and will not compile against the released one |
@@ -198,6 +199,9 @@ under every oracle failure mode.
 | 20 Nov | Breach requires **two consecutive** extreme observations | A single manipulated or fat-fingered print must not forfeit fees |
 | 20 Nov | The drawdown mark is the Chainlink price, against its own high-water mark | Keeps the risk input external; the vault's NAV must not be both the thing constrained and the input |
 | 20 Nov | A stale or never-run evaluation is `Restricted` for the curator | A keeper outage must degrade toward restriction, never toward permissiveness |
+| 23 Nov | The bond is **exit-priority collateral, not market-loss insurance** | A market move between claim registration and settlement is borne by the shares that bore the risk. Slashing the curator for the pool moving is punishment, not risk control. |
+| 23 Nov | `uncoveredShortfall` is a historical counter, not a live deduction | It records bond value already delivered in the last-resort branch. Netting it again at the curator's exit would charge the same value twice. |
+| 23 Nov | `CuratorExited` emits only `(curator, proceeds)` | The `shortfallNetted` field could only ever be zero on the shipped paths; keeping it implied a mechanism the contract does not have. |
 
 ---
 
@@ -466,6 +470,42 @@ re-added only the depositor position, required prior exit approval for the curat
 left the curator's proceeds idle with a stale `curatorBondValue`. Neither was on the demo path.
 The mandate now fixes the pool and range; the curator can add bonded liquidity, not migrate the
 position. This is a smaller surface with a clearer security story, and the docs say so.
+
+---
+
+## 12. Bond semantics and redeploy prep — session of 23 November 2026
+
+**The model is now honest, and the code matches it.** The bond is **exit-priority collateral**,
+not market-loss insurance.
+
+| Change | Why |
+|---|---|
+| Removed the close-time `uncoveredShortfall` charge | It reduced the bond but never paid the depositor. A counter is not a transfer. |
+| Removed the exit-time netting in `curatorExit` | After the charge was removed, netting would charge the same value twice, and a market loss must not be charged at all. |
+| `curatorExitProceeds()` returns `_assetsForLiquidity(curatorLiquidity)` | The live value of what remains, not "bond value − shortfall". |
+| `CuratorExited(address,uint256)` — `shortfallNetted` removed | It could only ever be zero on the shipped paths. |
+| `test_workedExample_marketLossStaysWithTheDepositor` | Replaces the old "bond absorbs the shortfall" test; asserts the bond is untouched and the loss stays with shares. |
+| `Counterfactual.t.sol` rewritten | Proves the ordering difference: without CEP the bond is gone before the claim is registered; with CEP it is locked behind the claim while the depositor is paid. |
+
+`uncoveredShortfall` remains as a **historical accountability counter** for bond value delivered
+to depositors in the defensive last-resort branch (`pending > depositor liquidity`). Normal claim
+maths keeps `Q <= D`, so that branch is not reachable by an ordinary withdraw; it is a bounded
+safety net, not a promise that the bond pays market losses.
+
+**Suite:** 67 tests, 0 failures; 7 invariants at 2,000 runs × 100,000 calls; `forge fmt --check`
+clean; dashboard `tsc --noEmit` clean.
+
+**Demo wallet:** `0xc96d811952e6f87EFd0ddEDa3b85fe30F768AB5A`, key in the gitignored
+`contracts/.env` as `DEMO_DEPOSITOR_PRIVATE_KEY`, funded with 0.002 ETH for gas. Import it into
+the recording browser; the deployer stays the curator.
+
+**Redeploy funding:** the deployer holds ~0.94 USDC. Circle's faucet sends 20 USDC per request,
+every 2 hours, per address/chain. Seed sizes for the arriving balance: 20 → 10/6/4, 40 →
+20/12/8, 60+ → 30/18/12 (depositor A / depositor B / curator bond). The pool also needs WETH;
+the deployer holds ~0.0078 WETH and the old deployment can return ~0.0022 more.
+
+**Still blocked:** the redeploy itself, until the USDC arrives. The old deployment runs
+pre-fix bytecode and is drained; do not record against it.
 
 ---
 

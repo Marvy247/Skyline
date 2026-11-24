@@ -45,7 +45,7 @@ export function describe(errorName: string, args?: readonly unknown[]): string {
     case "CuratorExitNotApproved":
       return "The curator's exit has not been approved. Vault approval AND an empty obligation ledger are both required."
     case "ExceedsShortfall":
-      return "The removal exceeded the shortfall the curator's bond is permitted to absorb."
+      return "The removal exceeded the shortfall the curator's bond is permitted to supply."
     case "FeeCapExceeded":
       return `Dynamic fee ${String(args?.[0] ?? "?")} bps exceeded the mandate cap of ${String(args?.[1] ?? "?")} bps.`
     case "BelowBand":

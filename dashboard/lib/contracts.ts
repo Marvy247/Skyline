@@ -543,11 +543,11 @@ export const mandateVaultAbi = [
   },
   {
     type: "event",
-    name: "ShortfallAbsorbed",
+    name: "BondShortfallDelivered",
     inputs: [
       { name: "curator", type: "address", indexed: true },
       { name: "amount", type: "uint256", indexed: false },
-      { name: "remainingShortfall", type: "uint256", indexed: false },
+      { name: "deliveredToDate", type: "uint256", indexed: false },
     ],
   },
   {
@@ -556,7 +556,6 @@ export const mandateVaultAbi = [
     inputs: [
       { name: "curator", type: "address", indexed: true },
       { name: "proceeds", type: "uint256", indexed: false },
-      { name: "shortfallNetted", type: "uint256", indexed: false },
     ],
   },
 ] as const satisfies Abi

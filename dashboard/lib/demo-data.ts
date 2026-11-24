@@ -70,8 +70,16 @@ export const demoScenarioBlocked: MandateState = {
   verifyPending: { derived: 55_556n, recorded: 55_556n },
 }
 
-/** Scenario B — "the bond absorbs the shortfall". The curator's capital covers the gap. */
-export const demoScenarioAbsorption: MandateState = {
+/**
+ * Scenario B — the defensive last-resort branch.
+ *
+ * Depositor liquidity provably cannot cover the obligation (`pending > depositorLiquidity`).
+ * This state is not reachable through an ordinary `requestWithdraw` — normal claim maths keeps
+ * `pending <= depositorLiquidity`. It is the branch the hook uses to bound a bond removal to the
+ * shortfall: the bond supplies the remainder, and the proceeds go to the depositor. The same
+ * value is not deducted again at the curator's exit, and a market loss is never charged here.
+ */
+export const demoScenarioLastResort: MandateState = {
   ...demoScenarioBlocked,
   pendingLiquidity: 90_000n,
   curatorLiquidity: 10_000n,
@@ -87,9 +95,10 @@ export const demoScenarioAbsorption: MandateState = {
       status: 1,
     },
   ],
-  uncoveredShortfall: 10_000_000_000n,
+  curatorExitBlocked: false,
+  uncoveredShortfall: 0n,
   curatorBondValue: 10_000_000_000n,
-  curatorExitProceeds: 0n,
+  curatorExitProceeds: 10_000_000_000n,
   currentSkinBps: 1111,
   verifyCep: { cepHolds: true, pending: 90_000n, curatorLiquidity: 10_000n, curatorMayExit: false },
   verifyCuratorBond: { poolDerived: 10_000n, recorded: 10_000n },
@@ -120,14 +129,16 @@ export const demoScenarioSettled: MandateState = {
 
 /**
  * DEMO MODE lets the presenter switch scenario with a query parameter:
- *   /dashboard?scenario=blocked | absorption | settled
+ *   /dashboard?scenario=blocked | lastresort | settled
+ * (`absorption` is kept as an alias for the last-resort scenario.)
  * This is the Demo Day contingency: if the RPC or the chain misbehaves, the
  * dashboard still tells the story.
  */
 export function scenarioFromQuery(value: string | null): MandateState {
   switch (value) {
+    case "lastresort":
     case "absorption":
-      return demoScenarioAbsorption
+      return demoScenarioLastResort
     case "settled":
       return demoScenarioSettled
     case "blocked":

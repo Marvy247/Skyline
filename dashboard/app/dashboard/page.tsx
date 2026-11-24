@@ -158,7 +158,7 @@ function DashboardInner() {
                 <PanelHeader
                   icon={<ClipboardList className="h-4 w-4" />}
                   title="Exit ladder"
-                  subtitle="Who serves the claim, who absorbs the loss."
+                  subtitle="Who serves the claim, and who leaves last."
                 />
                 <div className="px-6 py-5">
                   <ExitLadder

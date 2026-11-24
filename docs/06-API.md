@@ -149,7 +149,7 @@ function curatorDeposit(uint256 assets) external returns (uint128 liquidityAdded
 function curatorTopUp(uint256 assets) external returns (uint128 liquidityAdded);
 function requestCuratorExit() external returns (bool);
 function curatorBondValue() external view returns (uint256);       // derived from pool state
-function curatorExitProceeds() external view returns (uint256);   // bondValue − uncovered shortfall
+function curatorExitProceeds() external view returns (uint256);   // live value of the remaining bond
 ```
 
 ### 2.4 Strategy functions
@@ -187,7 +187,7 @@ struct CuratorInfo {
     uint64  registeredAt;
     uint32  strategyCount;
     uint128 lifetimeFees;      // token units
-    uint128 lifetimeAbsorbed;  // shortfall absorbed — published, not punished
+    uint128 lifetimeAbsorbed;  // bond value delivered in the last-resort path — published, not punished
     uint32  epochsActive;
     bool    active;
 }
@@ -325,8 +325,8 @@ event WithdrawalRequested(address indexed depositor, uint256 indexed claimId, ui
 event ClaimsSettled(uint256 count, uint256 assetsPaid);
 event CuratorBonded(address indexed curator, uint256 assets, uint128 liquidityAdded);
 event CuratorExitRequested(address indexed curator, uint64 timestamp);
-event CuratorExited(address indexed curator, uint256 proceeds, uint256 shortfallNetted);
-event ShortfallAbsorbed(address indexed curator, uint256 amount, uint256 remainingShortfall);
+event CuratorExited(address indexed curator, uint256 proceeds);
+event BondShortfallDelivered(address indexed curator, uint256 amount, uint256 deliveredToDate);
 event PerformanceFeeAccrued(uint256 feeShares, uint256 hwm, uint256 navPerShare);
 event PerformanceFeeForfeited(uint256 hwm, uint256 navPerShare);
 ```

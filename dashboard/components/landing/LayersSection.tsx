@@ -28,8 +28,8 @@ const LAYERS = [
   {
     icon: TrendingDown,
     step: "04",
-    title: "Loss absorption",
-    body: "When depositor liquidity cannot cover claims at fair value, the curator's bonded capital absorbs the shortfall, and the curator's exit proceeds are netted by it.",
+    title: "Last-resort drawdown",
+    body: "If depositor liquidity provably cannot cover an obligation, the bond supplies the remainder, bounded by the shortfall, and the proceeds go to the depositor. A market loss is never charged to the curator.",
     tag: "vault, gated by hook",
   },
 ]

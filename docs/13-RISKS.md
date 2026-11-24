@@ -29,8 +29,8 @@
 | ID | Risk | L | I | Score | Mitigation |
 |---|---|---|---|---|---|
 | R-13 | Scope creep into "curated LP network" territory | 4 | 4 | 16 | `docs/01-PROJECT-BRIEF.md` §6 non-goals are binding. Any new feature needs an explicit scope change, not a quiet addition. |
-| R-14 | Loss-absorption accounting is buggy | 3 | 4 | 12 | Keep curator bond value **out** of `totalAssets()` entirely. The bond is a carve-out; depositor NAV never includes it. |
-| R-15 | Loss absorption is never finished | 3 | 3 | 9 | Ship the **gate** first (Phase 2). Absorption is the amplifier, not the thesis. |
+| R-14 | Last-resort bond accounting is buggy | 3 | 4 | 12 | Keep curator bond value **out** of `totalAssets()` entirely. The bond is a carve-out; depositor NAV never includes it. |
+| R-15 | Last-resort drawdown is never finished | 3 | 3 | 9 | Ship the **gate** first (Phase 2). The bounded drawdown is the safety net, not the thesis. |
 | R-16 | Chainlink integration slips | 3 | 2 | 6 | One feed, one risk calculation. The exit path never depends on it. |
 | R-17 | The demo depends on a live network | 4 | 5 | 20 | Demo fixture (`?scenario=blocked`) + a recorded 90-second clip. The demo must survive a failing network. |
 | R-18 | An agent picks up the repo and breaks the architecture | 3 | 4 | 12 | The `README.md` §0 operating rules, `docs/05-SECURITY.md` invariants, `docs/15-PROGRESS.md` handover notes, and "never commit a failing test". |
@@ -64,7 +64,7 @@
 
 | ID | Risk | Why we accept it |
 |---|---|---|
-| R-28 | The curator's capital is custodied by the vault | The alternative (a separate bond contract) means the vault cannot force absorption without the curator's cooperation, which makes loss absorption unenforceable. The curator's balance is independently verifiable, which is what actually matters. |
+| R-28 | The curator's capital is custodied by the vault | The alternative (a separate bond contract) means the vault cannot force a bounded last-resort drawdown without the curator's cooperation. The curator's balance is independently verifiable, which is what actually matters. |
 | R-29 | The drawdown limit requires an oracle | A limit that needs no external mark would be measuring the wrong thing. It is confined to curator-side restrictions. |
 | R-30 | No upgrade path | A mutable curator-mandate contract is a mutable risk contract. Deploy a new vault. |
 | R-31 | The dashboard does not chart historical performance | Performance charts are the curator's marketing. Skyline's product is ordering. Drawing a performance chart would blur the message. |

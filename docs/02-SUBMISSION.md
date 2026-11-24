@@ -49,8 +49,8 @@
 > Skyline makes curator capital **junior** to depositor capital by construction. A Uniswap v4
 > hook keeps its own independent ledger of outstanding depositor withdrawal obligations and
 > **rejects any removal of curator-bonded liquidity while those obligations are unsettled** —
-> at the PoolManager level, so no execution path can route around it. When depositor liquidity
-> cannot cover claims at fair value, the curator's bond absorbs the shortfall.
+> at the PoolManager level, so no execution path can route around it. If depositor liquidity
+> cannot cover an obligation, the bond is a last-resort backstop, bounded by the shortfall.
 
 ---
 
@@ -82,8 +82,10 @@ withdrawal obligations** and prevents curator-bonded liquidity from being remove
 obligations remain unsettled.
 
 When depositor withdrawal obligations cannot be satisfied from available depositor liquidity,
-predefined loss-absorption rules expose the curator's bonded capital to the shortfall, and the
-curator's exit proceeds are netted against it.
+the hook's last-resort branch allows the bond to be drawn down **only up to the shortfall**, and
+the proceeds are delivered to the depositor. The bond is not a general escape hatch. A market
+loss between claim registration and settlement is borne by the shares that bore the risk; the
+curator is not slashed because the pool moved.
 
 ### 5.1 Mechanism components
 
@@ -91,10 +93,28 @@ curator's exit proceeds are netted against it.
 |---|---|
 | **Curator bond** | Ensures the curator has capital at risk, held in an identifiable position inside the same pool. |
 | **Exit priority** | Depositors receive priority over curator withdrawals, enforced by the hook's own ledger. |
-| **Loss absorption** | The curator bond absorbs predefined shortfalls; the curator's exit proceeds are netted against uncovered claims. |
+| **Last-resort bond drawdown** | If depositor liquidity cannot cover an obligation, the bond supplies the remainder, bounded by the shortfall and paid to the depositor. Market losses are not slashed from the curator. |
 | **Mandate enforcement** | Prevents unauthorised strategy operations — fee cap, tick band, minimum skin, drawdown limits. |
 | **Performance-fee forfeiture** | Aligns compensation with responsible management: fees forfeited on a confirmed drawdown breach. |
 | **Chainlink risk regime** | An external mark selects `Normal`/`Restricted`/`Breached`; a stale or failed read degrades toward restriction, never toward permissiveness. |
+
+---
+
+### 5.2 What the counterfactual proves
+
+`test/unit/Counterfactual.t.sol` runs the same vault, the same curator and the same withdrawal
+twice — with the gate and without it.
+
+| | Without CEP | With CEP |
+|---|---|---|
+| Curator exits first | allowed | **blocked** |
+| Bond at the moment the claim is registered | **0** | **still in the pool** |
+| Depositor's market payout | whatever remains | the same market payout — **ordering changed, not the price** |
+| Curator accountability | none | locked behind the claim until it settles |
+
+This is the honest claim. CEP does not insure the depositor against the market; it removes the
+curator's head start. The depositor was always exposed to the strategy; they were never supposed
+to be exposed to the curator's exit.
 
 ---
 
@@ -105,15 +125,16 @@ curator's exit proceeds are netted against it.
 2. **Hook-Enforced Exit Priority** — curator liquidity cannot be withdrawn ahead of outstanding
    depositor claims. The restriction is enforced by the hook's own ledger, not asserted by the
    vault.
-3. **Economic Loss Alignment** — predefined mechanisms expose curator-bonded capital to
-   eligible liquidity shortfalls; uncovered claims are netted from curator exit proceeds.
+3. **Economic Alignment** — the curator's own capital sits in the same pool and cannot leave
+   ahead of depositors. In the last-resort case the bond is drawn down only up to the uncovered
+   liquidity shortfall, and the proceeds go to the depositor. A market loss is borne by depositor
+   shares, not slashed from the curator.
 4. **Programmable Mandates** — strategy permissions, allocation limits and risk parameters are
    committed at pool creation and enforced by the hook at the point of action.
 5. **Verifiable Accountability** — strategy operations, withdrawal requests, curator
    restrictions and performance records are recorded on-chain and independently readable.
-6. **Depositor Exit Is Never Blocked** — Skyline reorders *who leaves first* and *who absorbs
-   the loss*. It never prevents a depositor from exiting; a pro-rata last-resort path guarantees
-   liveness.
+6. **Depositor Exit Is Never Blocked** — Skyline reorders *who leaves first*. It never prevents
+   a depositor from exiting; a pro-rata last-resort path guarantees liveness.
 
 ---
 
@@ -166,7 +187,7 @@ curator's capital to depositor withdrawal obligations.
 | Curated LP networks (depositors follow managers) | Depositors follow a curator whose capital is bonded and subordinated to them |
 | Hooks that auto-rebalance via oracle triggers | Chainlink-sourced risk regime freezes risk-increasing curator operations in `Restricted`/`Breached`; a stale feed restricts rather than relaxes |
 | Performance fees | High-water-mark performance fee, dilution-only, forfeited on a confirmed drawdown breach |
-| **Curator Exit Parity (new)** | **Bonded curator capital, hook-enforced exit priority, loss absorption** |
+| **Curator Exit Parity (new)** | **Bonded curator capital, hook-enforced exit priority, last-resort bond drawdown** |
 
 ---
 
@@ -199,9 +220,10 @@ A live, seeded scenario on Base Sepolia (addresses in §13.1):
 2. The strategy degrades. A depositor requests a withdrawal → the hook records the obligation.
 3. **The curator attempts to exit. The hook rejects it.** The depositor's claim has priority,
    and the restriction is enforced by the hook's own ledger, not by the vault's word.
-4. Claims settle. Depositor liquidity funds them; where it cannot, the curator's bond absorbs
-   the shortfall and the dashboard shows exactly who absorbed what.
-5. The curator may now exit — netted against any uncovered claim.
+4. Claims settle from depositor liquidity while the curator remains locked. In the last-resort
+   case, the bond supplies the uncovered liquidity, bounded by the shortfall, and the proceeds go
+   to the depositor. A market loss is not charged to the curator.
+5. The curator may now request an exit and receive the remaining bond's proceeds.
 6. A second curator operation is attempted outside the committed mandate. The hook rejects that
    too.
 
@@ -261,7 +283,7 @@ Refresh this document whenever the implementation diverges from it.
 
 - [x] Phase 0 confirmed the v4 position-keying model — attach the Foundry assertion output
 - [ ] Confirm which Chainlink product the prize track actually wants; adjust §10
-- [x] Replace "predefined loss-absorption rules" with the shipped rule
+- [x] Replace "predefined loss-absorption rules" with the shipped lock plus bounded last-resort drawdown
 - [x] Add the actual deployed pool address, hook address, vault address
 - [ ] Add a short architecture diagram to the submission if the form allows
 - [x] Confirm the demo scenario matches `docs/11-DEMO.md` exactly

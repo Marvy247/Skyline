@@ -18,7 +18,7 @@ const BEATS = [
   {
     n: "03",
     title: "Claims settle from depositor liquidity",
-    body: "Where depositor liquidity cannot cover the claims, the curator's bond absorbs the shortfall and their exit proceeds are netted by it.",
+    body: "The curator stays locked while claims are served. If depositor liquidity provably cannot cover an obligation, the bond supplies the remainder, bounded by the shortfall. A market loss is never charged to it.",
   },
 ]
 

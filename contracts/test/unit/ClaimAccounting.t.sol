@@ -57,7 +57,7 @@ contract ClaimAccountingTest is SkylineFixture {
         assertGe(bobAssetsAfter, bobAssetsBefore * 999 / 1000, "the remaining depositor must not be diluted");
     }
 
-    function test_bondShortfallSettlementAlsoBurnsTheShares() public {
+    function test_fullSettlementAfterALossAlsoBurnsTheShares() public {
         seedScenario();
         movePrice(true, 200_000e18);
 
@@ -68,10 +68,10 @@ contract ClaimAccountingTest is SkylineFixture {
         vault.requestWithdraw(aliceShares);
         vault.settleClaims(10);
 
-        assertEq(vault.totalSupply(), supplyBefore - aliceShares, "bond-assisted settlement must burn too");
-        assertEq(vault.outstandingClaims(), 0, "the claim must close after the bond covers the value gap");
+        assertEq(vault.totalSupply(), supplyBefore - aliceShares, "loss settlement must burn too");
+        assertEq(vault.outstandingClaims(), 0, "the claim must close after the depositor's liquidity serves it");
         assertEq(uint256(uint128(hook.pendingLiquidity(poolId))), 0, "the hook ledger must be empty");
-        assertGt(vault.uncoveredShortfall(), 0, "this scenario must exercise the bond");
+        assertEq(vault.uncoveredShortfall(), 0, "a market loss is not charged to the bond");
     }
 
     function test_anyoneCanExpireAnExpiredClaim() public {

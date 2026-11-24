@@ -12,7 +12,7 @@ const FEATURES = [
   {
     icon: Ban,
     title: "Depositors are never locked out",
-    body: "Skyline reorders who leaves first and who absorbs the loss. It never prevents a depositor from exiting. A pro-rata last resort guarantees liveness.",
+    body: "Skyline reorders who leaves first. It never prevents a depositor from exiting; a pro-rata/expiry last resort guarantees liveness.",
   },
   {
     icon: Gauge,

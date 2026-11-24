@@ -157,12 +157,12 @@ function invariant_cepHolds() public view {
     int128 q = hook.pendingLiquidity(poolId);
     int128 d = hook.depositorLiquidity(poolId);
 
-    if (q > 0) {
-        // The curator may only have exited under insolvency, and only by the shortfall.
-        assert(hook.curatorLiquidity(poolId) == 0 || d >= q || shortfallWasAbsorbed);
+    if (q > 0 && q <= d) {
+        // The healthy case: no curator-salt removal may be approved, and the hook's own
+        // verification must hold. The q > d branch is the defensive last resort.
+        assertFalse(hook.curatorExitApproved(poolId));
+        assert(hook.verifyCep(poolId).cepHolds);
     }
-    // The invariant the dashboard badge reports:
-    assert(hook.verifyCep(poolId).cepHolds);
 }
 ```
 

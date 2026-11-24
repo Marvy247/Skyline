@@ -1,215 +1,160 @@
 # Skyline — Curator Exit Parity for Uniswap v4
 
-**UHI11 (11th Uniswap Hook Incubator) — primary submission**
-*The Exit-Alignment Protocol for Curated Liquidity*
+**UHI11 (11th Uniswap Hook Incubator) — Active Management & Curation**
+Team: **Marvy247**
 
-> **You manage the liquidity. You share the risk. You don't get to run first.**
+> The curator manages the liquidity. They share the risk. **They don't get to run first.**
+
+Skyline is a Uniswap v4 protocol that makes a curator's capital **junior to depositor
+withdrawals**. It is not another vault, yield strategy or copy-trading product: the contribution
+is an **exit-ordering guarantee** enforced inside the hook, at the PoolManager, where no vault,
+router or keeper can route around it.
+
+**Live on Base Sepolia (84532).** The final hook, vault, keeper and `PoolId` are written by the
+deploy script to [`contracts/deployments/84532.json`](contracts/deployments/84532.json). The
+dashboard in [`dashboard/`](dashboard/) reads the same values from `dashboard/.env.local`. The
+90-second demo script is [`docs/11-DEMO.md`](docs/11-DEMO.md).
 
 ---
 
-## 0. Read this first (operating protocol for an AI agent)
+## The problem
 
-This repository contains **both the specification and a working implementation**. The docs exist
-so that you — or any AI agent picking it up cold — can understand Skyline correctly, in order,
-without re-deriving the research and without repeating the architectural mistakes this project is
-designed to avoid.
+A curated vault lets a manager run a strategy with other people's money. The manager learns
+first that the strategy is degrading. In every existing implementation, withdrawal is a
+**symmetric ERC-4626 redeem**: the curator's exit is the same operation as a depositor's, and
+the curator — who knows more and is closer to the controls — can take it first.
 
-### 0.1 Order of operations
+That exit consumes pool liquidity and moves the price against everyone still inside. The
+manager was paid to manage the risk, then left ahead of the people who funded it.
 
-1. Read `docs/01-PROJECT-BRIEF.md` — what we are building and why.
-2. Read `docs/03-ARCHITECTURE.md` — how it is put together.
-3. Read `docs/05-SECURITY.md` — the invariants you may **never** break.
-4. Read `docs/07-BUILD-ORDER.md` — the task list, in dependency order.
-5. Work it. Update `docs/15-PROGRESS.md` as you go.
-6. Before Demo Day, run `templates/READINESS_CHECKLIST.md` top to bottom.
+The bug is not bad faith. It is **exit ordering**. No amount of disclosure fixes it, because the
+incentive exists at the exact moment disclosure is least likely.
 
-### 0.2 Non-negotiable rules
+## The mechanism
 
-These are hard constraints derived from verified Uniswap v4 mechanics. Violating any of them
-breaks the core thesis or opens a fund-loss bug.
+A Skyline vault owns **two Uniswap v4 positions** in the same pool, distinguished by salt:
 
-| # | Rule | Why |
+| Position | Salt | Capital |
 |---|---|---|
-| R1 | **Curator liquidity and depositor liquidity live in two separate v4 positions**, distinguished by `salt`. Never merge them. | The exit waterfall is impossible to execute or audit if the two are one position. |
-| R2 | **The hook's obligation ledger is authoritative.** The vault is *never* asked "are there outstanding claims?" — the hook answers from its own state. | If the hook trusts the vault, the hook is decorative and the project has no thesis. |
-| R3 | **The obligation ledger is keyed by `PoolId` and denominated in liquidity, not claim count.** | Cross-pool lockout (claims in pool A blocking exits in pool B) and partial settlement both become bugs otherwise. |
-| R4 | **The oracle is never on the depositor exit path.** Chainlink may inform *risk parameters only*. | A stale/frozen feed must never be able to block a depositor from exiting. |
-| R5 | **`hookData` is untrusted input.** It may correlate a call; it may never authorise one. | The curator controls the `hookData` it passes. |
-| R6 | **Curator exit requires BOTH vault approval AND an empty hook ledger.** Approval alone is not sufficient. | The hook ledger is the binding constraint. |
-| R7 | **Depositor withdrawals can never be blocked or deadlocked.** A pro-rata last-resort path must always exist. | Deadlock is a total-loss-of-access bug and the fastest way to lose the demo. |
-| R8 | **No `PoolManager.get*` calls.** All pool reads go through `StateLibrary` (`extsload`). | `PoolManager` exposes no public getters in current v4-core; `poolManager.getSlot0()` does not compile. |
-| R9 | **Pin `v4-core` and assert the position-keying model in a Foundry test** before building anything on top of it. | The whole attribution model depends on `positionKey = keccak256(owner, tickLower, tickUpper, salt)`. |
-| R10 | **Claims expire.** Registered-but-unsettled claims time out and restore depositor shares. | Otherwise a depositor can grief-lock the curator indefinitely (symmetric attack). |
+| Depositor position | `LP_SALT` | All depositor capital, the active strategy |
+| Curator bond | `CURATOR_SALT` | The curator's own bonded capital |
 
-### 0.3 Definition of done
+The vault is the PoolManager owner of both positions. The curator's economic claim on the bond
+is recorded in vault accounting, but the position itself is held by the vault — so a last-resort
+drawdown does not need the curator's cooperation.
 
-- [ ] All Phase 0–9 tasks in `docs/07-BUILD-ORDER.md` marked complete in `docs/15-PROGRESS.md`
-- [ ] All six headline invariants in `docs/05-SECURITY.md` §4 green, including under fuzz
-- [ ] `forge test` passes; `forge fmt --check` clean; no compiler warnings
-- [x] Deployed on a public testnet (Base Sepolia) with a live pool
-- [ ] Dashboard renders real on-chain state and the demo scenario is reproducible end-to-end
-- [ ] `docs/11-DEMO.md` run-of-show rehearsed twice, timed
-- [ ] Submission text in `docs/02-SUBMISSION.md` reflects the *shipped* implementation
+Depositors exit through **claims**, not a direct redeem:
 
-### 0.4 Repository map
+1. `requestWithdraw(shares)` reserves the shares and registers a claim. The hook records the
+   obligation in `pendingLiquidity[poolId]`, denominated in **liquidity units**.
+2. The hook **rejects any removal of curator-bonded liquidity** while that ledger is non-empty.
+   The check runs in `beforeRemoveLiquidity`, below the vault.
+3. `settleClaims` serves claims FIFO from depositor liquidity. The hook decrements the ledger
+   only from the `liquidityDelta` it actually observes — never from a vault assertion.
+4. If depositor liquidity **provably cannot** cover a claim (`pending > depositorLiquidity`), the
+   hook permits a bond removal **bounded by the shortfall**, and the proceeds go to the
+   depositor. This is a defensive branch, not a general escape hatch.
+5. Only when the ledger is empty may the curator request an exit and realise the remaining bond.
 
-| File | Purpose |
+The mandate — fee cap, tick band, minimum skin, claim TTL and drawdown limit — is committed at
+pool registration and enforced by the same hook at the point of action. `Restricted` and
+`Breached` risk states freeze **risk-increasing** curator actions only; exits and every depositor
+action remain available.
+
+## Why the hook is load-bearing
+
+The interesting proof is not that a gate exists. It is what changes when it does.
+
+[`test/unit/Counterfactual.t.sol`](contracts/test/unit/Counterfactual.t.sol) runs the same vault,
+curator and withdrawal twice:
+
+| | Without CEP | With CEP |
+|---|---|---|
+| Curator exits first | allowed | **blocked** |
+| Bond at the moment the claim is registered | **0** | **still in the pool** |
+| Depositor's market payout | whatever remains | the same market payout — **ordering changed, not the price** |
+| Curator accountability | none | locked behind the claim until it settles |
+
+That is the honest claim: CEP changes **who leaves first and what the curator owes**, not the
+depositor's exposure to the market. The depositor was always exposed to the strategy; they were
+never supposed to be exposed to the curator's head start.
+
+## What the hook prevents, detects and refuses to do
+
+| Surface | Behaviour |
 |---|---|
-| `docs/01-PROJECT-BRIEF.md` | Problem, insight, mechanism, differentiation, scope, non-goals |
-| `docs/02-SUBMISSION.md` | The UHI11 submission text (Nov 16) — keep in sync with the build |
-| `docs/03-ARCHITECTURE.md` | Contract inventory, state layout, flows, state machines, trust model |
-| `docs/04-ECONOMICS.md` | CEP formalisation, exit ladder, loss absorption, fees, worked example |
-| `docs/05-SECURITY.md` | Threat model, the six invariants, full attack-surface analysis |
-| `docs/06-API.md` | Exact interface specs, storage layouts, errors, events |
-| `docs/07-BUILD-ORDER.md` | **Phase-by-phase task list with acceptance criteria** |
-| `docs/08-TESTING.md` | Test matrix, invariant handler sketch, fuzz targets, fork tests |
-| `docs/09-FRONTEND.md` | **Dashboard specification — what the template became** |
-| `docs/10-CHAINLINK.md` | Oracle/Automation integration spec and degradation behaviour |
-| `docs/11-DEMO.md` | Demo Day run-of-show, scenario, Q&A prep, contingency plan |
-| `docs/12-VERIFICATION.md` | Research dossier — every citation, competitor comparison, originality evidence |
-| `docs/13-RISKS.md` | Risk register with triggers and mitigations |
-| `docs/14-CONVENTIONS.md` | Solidity/Foundry/deploy conventions, dependency pinning |
-| `docs/15-PROGRESS.md` | Living status log + handover notes |
-| `docs/16-IMPLEMENTATION-NOTES.md` | **Every place the code diverged from the spec, and why** |
-| `templates/` | Contract, hook, test, invariant, spec and readiness templates |
-| `contracts/` | Foundry implementation — `bootstrap.sh` installs the pinned dependencies |
-| `dashboard/` | **The Next.js dashboard** — see `docs/09-FRONTEND.md` |
+| Tick band / fee cap / minimum skin | **Prevented** — a curator action outside the mandate reverts in the hook |
+| Curator exit while obligations are outstanding | **Prevented** — `CuratorExitBlocked(pending)` from `beforeRemoveLiquidity` |
+| Depositor exit | **Never blocked** — no oracle, risk state or curator action is on the depositor path |
+| Drawdown breach | **Detected and penalised** — performance fee forfeited after two confirming observations |
+| Market loss between request and settlement | **Borne by the shares that held it** — the bond is exit-priority collateral, not loss insurance |
+| Curator merely being locked | **Not slashing** — the bond stays the curator's, and is paid out when the queue clears |
 
----
+Depositor liveness has a backstop: claims are served pro rata if total claims ever exceed
+available liquidity, and after the claim TTL **anyone** can expire an unsettled claim and restore
+the unserved shares. The worst case is a partial payout, not a permanent lockout.
 
-## 1b. The dashboard (already built)
+## What this is not
 
-The frontend lives in `dashboard/` and is **complete**: Next.js 15 + wagmi v2 + viem v2 +
-TanStack Query, six tabs, live pool reads, decoded reverts, and a demo-fixture mode.
+Skyline does not pick strategies, generate yield, or promise that the curator is good. It does
+not insure depositors against market moves, and it does not slash a curator because the pool
+moved. It is unaudited; what exists is a stateful invariant suite, not a security audit. One pool
+per vault. The vault custodies the bond position, which is disclosed and independently
+derivable from pool state.
 
-```bash
-cd dashboard
-npm install
-cp .env.example .env.local     # optional — without it the dashboard runs in demo mode
-npm run dev                     # http://localhost:3000  ·  /dashboard
-```
-
-**Demo mode** needs no configuration and no network: `?scenario=blocked` reproduces the
-worked example from `docs/04-ECONOMICS.md` §5. That is the Demo Day contingency.
-
-Key files: `dashboard/lib/contracts.ts` (addresses, ABIs, PoolId derivation) ·
-`dashboard/hooks/use-mandate.ts` (one batched multicall) ·
-`dashboard/components/dashboard/exit-gate-panel.tsx` (the demo centrepiece).
-
-Verified: `tsc --noEmit` clean · `next build` clean with no warnings · both routes return 200.
-
----
-
-## 1. Thirty-second summary
-
-Curated liquidity vaults let a manager run a strategy with other people's money. The manager
-holds an informational advantage. When the strategy degrades, informed depositors leave
-first, and the manager — who knew it was degrading — is perfectly positioned to leave ahead
-of them, degrading the price for everyone still inside.
-
-Every existing curated-liquidity implementation treats withdrawal as a **symmetric ERC-4626
-redeem**. That symmetry is the bug.
-
-**Skyline** makes curator capital **junior** to depositor capital by construction:
-
-- Curator capital is bonded into the pool as a **separate v4 position** (`CURATOR_SALT`).
-- Depositors exit via **recorded claims**, queued FIFO.
-- A **Uniswap v4 hook maintains its own independent ledger** of outstanding obligations and
-  **rejects any removal of curator-bonded liquidity while those obligations are unsettled** —
-  at the PoolManager level, so no code path can route around it.
-- When depositor liquidity cannot cover claims at fair value, the **curator's bond absorbs the
-  shortfall**, and the curator's exit proceeds are netted against it.
-- A **mandate** of committed parameters (fee cap, tick band, minimum skin, drawdown limits) is
-  enforced by the same hook.
-
-The curator cannot extract their aligned capital ahead of outstanding depositor obligations.
-Not by policy. Not by reputation. By construction.
-
----
-
-## 1c. Status
+## Status
 
 | Component | State |
 |---|---|
-| **Contracts** | Implemented and tested — **61 tests, all green** (33 core unit + 21 Chainlink/keeper + 7 invariants) (`contracts/`) |
-| **Dashboard** | Complete — typechecks, builds warning-free, ABI aligned (`dashboard/`) |
-| **Deployment** | **Live on Base Sepolia (84532)** — canonical v4 PoolManager, real USDC/WETH, live Chainlink ETH/USD feed; addresses below |
-| **Chainlink** | Price-feed risk regime and Automation-compatible keeper deployed on Base Sepolia; feed wiring and `performUpkeep` exercised on-chain |
+| Contracts | Implemented and tested — **67 tests, 0 failed** (39 core unit + 21 Chainlink/keeper + 7 invariants) |
+| Invariants | 7 invariants at **2,000 runs × 100,000 calls**, 0 reverts |
+| Dashboard | Next.js 15 + wagmi/viem — six tabs, live reads, decoded reverts, no-network demo fixture |
+| Deployment | Base Sepolia (84532), canonical v4 PoolManager, real USDC/WETH, live Chainlink ETH/USD feed |
+| Formatting | `forge fmt --check` clean; dashboard `tsc --noEmit` clean |
 
-### 1d. Live deployment — Base Sepolia (84532)
+## Repository map
 
-| Contract | Address |
+| Path | What it is |
 |---|---|
-| PoolManager (canonical v4) | `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408` |
-| SkylineHook | `0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80` |
-| SkylineVault | `0x51d200C87e05a4c3E13460E6F0D46977be2622C9` |
-| SkylineKeeper | `0x708C227792F969d62206E4d76603Aa1d1b9C5796` |
-| PoolId | `0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b` |
-| USDC (currency0) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
-| WETH (currency1) | `0x4200000000000000000000000000000000000006` |
-| Chainlink ETH/USD | `0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1` |
+| [`contracts/src/SkylineHook.sol`](contracts/src/SkylineHook.sol) | **The enforcement point** — obligation ledger, exit gate, mandate, risk state |
+| [`contracts/src/SkylineVault.sol`](contracts/src/SkylineVault.sol) | Depositor accounting, claim queue, bond, performance fee |
+| [`contracts/src/SkylineKeeper.sol`](contracts/src/SkylineKeeper.sol) | Chainlink Automation-compatible keeper (optional by construction) |
+| [`contracts/test/unit/Counterfactual.t.sol`](contracts/test/unit/Counterfactual.t.sol) | With-CEP vs without-CEP ordering — the load-bearing proof |
+| [`contracts/test/invariant/Cep.t.sol`](contracts/test/invariant/Cep.t.sol) | The stateful invariant suite |
+| [`dashboard/`](dashboard/) | The demo dashboard |
+| [`docs/02-SUBMISSION.md`](docs/02-SUBMISSION.md) | The submission text |
+| [`docs/04-ECONOMICS.md`](docs/04-ECONOMICS.md) | CEP formalisation and the exit ladder |
+| [`docs/16-IMPLEMENTATION-NOTES.md`](docs/16-IMPLEMENTATION-NOTES.md) | **Every place the code diverged from the spec, and why** |
+| [`docs/15-PROGRESS.md`](docs/15-PROGRESS.md) | Living status log and handover notes |
 
-The pool is a real USDC/WETH v4 pool (fee `3000`, tick spacing `60`) with the position range
-`196020..208080`. The vault is seeded with a curator bond and two depositors. `riskState` is
-`Normal`; `effectiveRiskState` stays `Normal` while the keeper's evaluation is fresh and
-degrades to `Restricted` once it is more than an hour old — by design. The full artifact,
-including deployer, curator and seed flag, is `contracts/deployments/84532.json`. The complete
-demo path — claim, blocked curator exit, settlement, then a successful exit — was rehearsed
-against a Base Sepolia fork without mutating the live deployment
-(`docs/15-PROGRESS.md` §10.4).
-
-**Read `docs/16-IMPLEMENTATION-NOTES.md` before changing the design.** It records the eight
-places the implementation diverged from this specification and why — including three Uniswap v4
-mechanics the spec got wrong.
-
-## 2. Quick start (implementer)
+## Quick start
 
 ```bash
-# 1. The dashboard (already built)
-cd dashboard && npm install && npm run dev
-
-# 2. The contracts
-cd ../contracts
-./bootstrap.sh                                        # installs the pinned dependencies
-forge build
-forge test                                              # 61 tests, all green
-FOUNDRY_PROFILE=ci forge test --match-path "test/invariant/Cep.t.sol"   # 10,000 runs
-```
-
-The deploy path is proven locally and live on Base Sepolia:
-
-```bash
-anvil --port 8545 &
-FOUNDRY_PROFILE=deploy forge script script/Deploy.s.sol:DeploySkyline \
-  --rpc-url http://127.0.0.1:8545 --broadcast \
-  --private-key <anvil key>          # writes deployments/<chainid>.json
-```
-
-`FOUNDRY_PROFILE=deploy` is required: at the 1,000,000-run default the vendored `PoolManager`
-compiles to 26,947 bytes and exceeds the EIP-170 limit (see `docs/16` §14.3).
-
-Read any deployment back with:
-
-```bash
-VAULT=0x51d200C87e05a4c3E13460E6F0D46977be2622C9 \
-HOOK=0xBcf550c214Fe3Ea4e61813241Aab2B113E434F80 \
-MANAGER=0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408 \
-POOL_ID=0x7f355bcf7712d42494a0e9f860370f40f328bddfa465cccb630ddcc03a174b5b \
-FOUNDRY_PROFILE=deploy forge script script/Inspect.s.sol:Inspect --rpc-url "$BASE_SEPOLIA_RPC_URL"
-```
-
-The remaining work is **Phase 9**: record the 90-second clip and fill the team field. See
-`docs/15-PROGRESS.md` §3 for the per-phase checklist and §5 for the open issues.
-
-`contracts/lib` is not committed. A fresh clone installs the exact dependency set with:
-
-```bash
+# Contracts
 cd contracts
-./bootstrap.sh          # pinned forge-std, OpenZeppelin, v4-core and solmate
+./bootstrap.sh                                        # pinned deps: forge-std, OZ, v4-core, solmate
+forge build
+forge test                                            # 67 tests
+FOUNDRY_PROFILE=ci forge test --match-path "test/invariant/Cep.t.sol"   # 10,000 runs
+
+# Dashboard
+cd ../dashboard
+npm install
+cp .env.example .env.local     # optional — without it the dashboard runs in demo mode
+npm run dev                    # http://localhost:3000/dashboard
 ```
 
-The script pins `forge-std@v1.17.0`, `OpenZeppelin@v5.1.0`, `v4-core@v4.0.0` and the solmate
-commit that v4-core pins. The hook base is hand-written against the released core; the published
-`uniswap-hooks` package targets a newer core and is not used (`docs/16-IMPLEMENTATION-NOTES.md`
-§7). This has been verified end to end from a fresh `git clone`: bootstrap, build, and all 61
-tests pass.
+Demo mode needs no network: `?scenario=blocked` reproduces the worked example, and
+`?scenario=lastresort` shows the defensive bond branch. The live deployment can be read back
+with `script/Inspect.s.sol`; the exact cast commands are in `docs/11-DEMO.md` §9.
+
+`FOUNDRY_PROFILE=deploy` is required for deployment: at the 1,000,000-run default the vendored
+`PoolManager` exceeds EIP-170 (see `docs/16` §14.3). `contracts/lib` is not committed;
+`bootstrap.sh` installs the exact pinned set.
+
+## Documentation
+
+Start with **`docs/02-SUBMISSION.md`** for the pitch, **`docs/03-ARCHITECTURE.md`** for the
+mechanism, **`docs/04-ECONOMICS.md`** for the maths, and **`docs/05-SECURITY.md`** for the
+invariants. **`docs/16-IMPLEMENTATION-NOTES.md`** is the honest delta between specification and
+shipped code — read it before reviewing the contracts.

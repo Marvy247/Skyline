@@ -16,7 +16,7 @@
 | # | Area | Spec said | Code does | Why |
 |---|---|---|---|---|
 | D1 | Ledger decrement | A vault calls `hook.settleClaim(...)` | The hook decrements **inside `afterRemoveLiquidity`**, from the removal it observes | Strictly stronger: the ledger cannot be decremented without real liquidity leaving the pool |
-| D2 | Loss absorption | Denominated in **liquidity units** | Denominated in the vault's **asset** (owed − paid) | A liquidity-unit shortfall is impossible by construction; the real loss is a *value* loss when the strategy degrades |
+| D2 | Claim accounting | Shortfall denominated in **liquidity units** and charged to the bond | Each claim records the **asset value promised and paid**; a market loss stays with the depositor's shares. The bond is exit-priority collateral. | A liquidity-unit shortfall is impossible by construction; the real loss is a *value* loss, and slashing it from the curator would charge the curator for the market |
 | D3 | Two-sided positions | Not addressed | Each deposit swaps **half** into the pool's other currency | A concentrated position straddling the price needs **both** currencies; a single-asset vault cannot fund it otherwise |
 | D4 | Claim TTL | Ambiguous | The TTL is an **expiry** only. Settlement is immediate | A depositor who asks to leave must not be made to wait a day |
 | D5 | Minimum skin | Applied to every modification | Applies once a bond exists; **exempts a full curator exit** | Otherwise the curator could never leave, and a depositor's first deposit would be rejected |
@@ -55,15 +55,15 @@ does not exceed the claim's outstanding remainder.
 
 ---
 
-## 3. D2 — loss absorption is denominated in the vault's asset
+## 3. D2 — a market loss is recorded, not charged to the bond
 
 **Spec (`docs/04` §3):** the ladder is "depositor liquidity → curator bond → pro rata", with
-the shortfall measured in **pool liquidity units**.
+the shortfall measured in **pool liquidity units** and absorbed by the bond.
 
 **Problem discovered in implementation.** A liquidity-unit shortfall is *impossible by
 construction*: a claim is sized from the depositor's own share of the position, so the total of
 all claims can never exceed the depositor liquidity. The third stage of the ladder could never
-fire.
+fire through normal claim maths.
 
 **What actually goes wrong is a value loss.** A claim promises a depositor a value. If the
 strategy degrades between registration and settlement, the liquidity removed is worth less than
@@ -84,26 +84,23 @@ struct ClaimRecord {
 }
 ```
 
-At settlement:
+The difference `assetsOwed − assetsPaid` is **not** charged to the curator. It is the market
+move between registration and settlement, borne by the shares that bore the risk. Charging it to
+the bond would be slashing the curator because the pool moved, which the design forbids.
 
-```solidity
-if (c.assetsOwed > c.assetsPaid) {
-    uint256 shortfall = c.assetsOwed - c.assetsPaid;
-    uint256 consumed = shortfall < curatorBondValue ? shortfall : curatorBondValue;
-    curatorBondValue -= consumed;
-    uncoveredShortfall += consumed;
-    emit ShortfallAbsorbed(curator, consumed, uncoveredShortfall);
-}
-```
+`uncoveredShortfall` is therefore **not a live liability**. It is a historical counter of bond
+value delivered to depositors in the defensive last-resort branch (`pending > depositor
+liquidity`). That value left the curator's position when the bond liquidity was removed, so it
+is not netted again at the curator's exit. `curatorExitProceeds()` returns the live value of the
+remaining bond.
 
-and the curator's exit proceeds are netted by `uncoveredShortfall`.
-
-**Consequence worth stating honestly.** The bond also covers the vault's own execution cost —
-the swap that converts the position's second currency back into the asset the vault pays in.
-In the test suite that residual is ~14 bps on an undisturbed pool. It is charged to the bond
-because the bond is the protocol's loss-absorbing capital. If you would rather the vault
-absorbed its own costs, that is a one-line change — but then the bond is strictly smaller and
-the curator's alignment is weaker.
+**Consequence worth stating honestly.** The bond is **exit-priority collateral, not market-loss
+insurance**. Its job is to be present and locked while depositors leave. The vault's own
+execution cost — the swap that converts the position's second currency back into the asset the
+vault pays in — is likewise borne by the shares, not the bond. In the test suite that residual is
+~14 bps on an undisturbed pool. This is the model `docs/04-ECONOMICS.md` now describes, and the
+one `test/unit/Counterfactual.t.sol` demonstrates: the hook changes **ordering and
+accountability**, not the depositor's market payout.
 
 ---
 
@@ -268,10 +265,12 @@ remaining time before 3 December.
 |---|---|---|
 | `test/unit/Primitives.t.sol` | 8 | Phase 0 — the v4 mechanics, plus deposit pricing |
 | `test/unit/ClaimLedger.t.sol` | 17 | Phase 2 — the ledger, the gate, expiry, limits |
-| `test/unit/ExitLadder.t.sol` | 8 | Phase 4 — the demo script |
+| `test/unit/ExitLadder.t.sol` | 8 | Phase 4 — the demo script, including market-loss semantics |
+| `test/unit/ClaimAccounting.t.sol` | 4 | Share reservation, burns, expiry-permissionless cancel |
+| `test/unit/Counterfactual.t.sol` | 2 | With-CEP vs without-CEP ordering |
 | `test/Oracle.t.sol` | 21 | Phase 7 — every feed failure mode, HWM ratchet, breach confirmation, keeper, fuzzed INV-5 |
 | `test/invariant/Cep.t.sol` | 7 invariants | 2,000 runs × 100,000 calls each, 0 reverts |
-| **Total** | **61** | All green |
+| **Total** | **67** | All green |
 
 **Commands:**
 
@@ -287,7 +286,9 @@ FOUNDRY_PROFILE=ci forge test --match-path "test/invariant/Cep.t.sol"   # 10,000
 
 1. **The vault's positions are funded by a swap.** A single-asset vault holding a two-sided
    concentrated position must convert. The conversion cost is real and small.
-2. **The bond covers the vault's execution costs** as well as the strategy's losses.
+2. **The bond is exit-priority collateral, not loss insurance.** A market loss, including the
+   vault's own execution cost, is borne by the shares that bore the risk; the curator is not
+   slashed because the pool moved.
 3. **The strategy is not modelled.** Skyline enforces ordering; it does not decide whether a
    strategy is good.
 4. **Single pool per vault.** The ledger is keyed by `PoolId`, so the architecture allows more.

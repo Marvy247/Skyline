@@ -77,7 +77,7 @@ It has four components, each of which is independently implementable and indepen
 |---|---|---|
 | **Curator bond** | The curator must post their own capital into the pool, in a position the protocol can identify as theirs. | Vault + hook (via `salt`) |
 | **Exit priority** | Depositors' recorded claims are served before the curator may remove any curator-bonded liquidity. | **Hook** — the authoritative ledger |
-| **Loss absorption** | When depositor liquidity cannot cover claims at fair value, the curator's bonded capital absorbs the shortfall, and the curator's exit proceeds are netted against it. | Vault accounting, gated by hook |
+| **Last-resort bond drawdown** | If depositor liquidity provably cannot cover a claim, the bond supplies the remainder, bounded by the shortfall and paid to the depositor. Market losses are not charged to the bond. | Vault accounting, gated by hook |
 | **Mandate enforcement** | Committed parameters (fee cap, tick band, minimum skin, drawdown limits) bound the curator's operating authority. | **Hook** |
 
 ### 3.1 Why the hook ledger is authoritative
@@ -168,7 +168,7 @@ Verified by source inspection, not by README:
 | Curator bond | **none** | bonded position, `CURATOR_SALT` |
 | Withdrawal queue | **none** | hook ledger, FIFO claims |
 | Exit priority / locking | **none** | enforced in hook |
-| Loss absorption | **none** | shortfall charged to bond |
+| Last-resort bond drawdown | **none** | bond supplies `Q − D`, paid to the depositor |
 | `salt` used | **no** | yes — two positions |
 | Hook `beforeRemoveLiquidity` | **not implemented** | core of the protocol |
 | Withdrawal path | symmetric ERC-4626 redeem | priority-gated, sequenced |
@@ -242,8 +242,9 @@ No hook in the catalogue implements curator-bonded liquidity with depositor-prio
 
 > Skyline makes curator capital **junior** to depositor capital by construction: a Uniswap v4
 > hook keeps its own ledger of outstanding depositor withdrawal obligations and rejects any
-> removal of curator-bonded liquidity while those obligations are unsettled — and when
-> depositor liquidity cannot cover the claims, the curator's bond absorbs the shortfall.
+> removal of curator-bonded liquidity while those obligations are unsettled. If depositor
+> liquidity provably cannot cover a claim, the bond supplies the remainder, bounded by the
+> shortfall and paid to the depositor.
 
 ---
 
@@ -255,10 +256,10 @@ Honest self-assessment, so nobody is surprised later.
 |---|---|---|
 | The exit ladder's economics are too subtle to explain in 5 minutes | Medium | `docs/11-DEMO.md` — one scenario, three beats, one repeated sentence |
 | Scope creep into "curated LP network" territory | Medium | `docs/01-PROJECT-BRIEF.md` §6 non-goals; enforce in review |
-| Loss absorption accounting is buggy | Medium | Never let `totalAssets` include curator bond value; keep the bond out of depositor NAV entirely |
+| Last-resort accounting is buggy | Medium | Never let `totalAssets` include curator bond value; keep the bond out of depositor NAV entirely. Market losses stay with shares; the bond is only a last-resort liquidity backstop. |
 | Chainlink feed unreliable on testnet | Medium | `docs/10-CHAINLINK.md` — risk state degrades in the safe direction and never touches the exit path |
 | Judges read it as "a vault with a hook attached" | Medium | The submission leads with the no-bypass argument; the demo shows a revert that a vault could not have produced |
-| We run out of time before the loss-absorption stage | Medium | Stage 2 (the gate) is the thesis; stage 1 (absorption) is the amplifier. Ship the gate first. |
+| We run out of time before the last-resort drawdown | Medium | The exit gate is the thesis; the last-resort drawdown is the safety net. Ship the gate first. |
 | A genuine fund-loss bug in the exit ladder | Low | `docs/05-SECURITY.md` — six headline invariants, fuzzed, plus `docs/13-RISKS.md` R-01..R-04 |
 
 ---

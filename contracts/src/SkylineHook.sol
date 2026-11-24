@@ -356,8 +356,8 @@ contract SkylineHook is SkylineBaseHook, ISkylineHook {
             }
 
             // --- Last resort ---
-            // Depositor liquidity provably cannot cover the claims, so the curator's bond must
-            // absorb the shortfall. The removal is bounded by the shortfall, so this can only
+            // Depositor liquidity provably cannot cover the claims, so the curator's bond supplies
+            // the shortfall. The removal is bounded by the shortfall, so this can only
             // ever move value OUT of the curator's capital. It is not an escape hatch.
             int128 shortfall = pending - depositorLiquidity[poolId];
             int128 removal = delta < 0 ? -delta : int128(0);

@@ -12,8 +12,9 @@ A **vault** holds two Uniswap v4 positions in the strategy pool — depositor ca
 liquidity modification at the PoolManager, maintains its own ledger of outstanding depositor
 withdrawal obligations, and rejects any removal of curator-bonded liquidity while those
 obligations are unsettled. Depositors exit by registering claims that are served FIFO from
-depositor liquidity; where depositor liquidity cannot cover a claim, the curator's bond
-absorbs the shortfall under an arithmetic condition the hook verifies itself. The hook also
+depositor liquidity. If depositor liquidity provably cannot cover a claim, the bond supplies the
+remainder under an arithmetic condition the hook verifies itself; a market loss between
+registration and settlement stays with the depositor's shares. The hook also
 enforces the curator's committed mandate: fee cap, tick band, minimum skin, and a risk state
 derived from an external mark.
 
@@ -61,10 +62,10 @@ liquidity positions at the same range"*.
 | Depositor position | `SkylineVault` | `LP_SALT` | All depositor capital, the active strategy position |
 | Curator bond position | `SkylineVault` | `CURATOR_SALT` | The curator's bonded capital |
 
-Both are owned by the vault, because the vault must be able to force the bond to absorb a
-shortfall **without the curator's cooperation**. The curator's ownership of that capital is an
-*economic* claim recorded in vault accounting — and, critically, one that anyone can verify
-independently from pool state (§6.4). The curator cannot be silently diluted.
+Both are owned by the vault, because the vault must be able to draw the bond down for a
+last-resort shortfall **without the curator's cooperation**. The curator's ownership of that
+capital is an *economic* claim recorded in vault accounting — and, critically, one that anyone
+can verify independently from pool state (§6.4). The curator cannot be silently diluted.
 
 ### 3.2 Salts
 
@@ -253,39 +254,27 @@ anyone → vault.settleClaims(maxClaims)
       available = depositorLiquidity (from hook shadow ledger)
       take = min(requiredLiquidity, available)
       if take > 0:
-        vault → poolManager.modifyLiquidity(LP_SALT, -take)   // hook: afterRemoveLiquidity → shadow--
-        vault → hook.settleClaim(poolId, claimId, take)        // hook verifies, pending -= take
+        vault → poolManager.modifyLiquidity(
+            LP_SALT, -take, hookData = encodeSettlement(claimId))
+          // hook afterRemoveLiquidity observes the real removal:
+          //   pendingLiquidity -= take; claim.settledAmount += take
       if still short:
-        shortfall = requiredLiquidity - take
-        // LAST RESORT: curator bond absorbs
+        // LAST RESORT (defensive: normal claim maths keeps Q <= D)
         vault → poolManager.modifyLiquidity(CURATOR_SALT, -shortfall)
-                // hook allows ONLY because pendingLiquidity > depositorLiquidity
-        vault → hook.settleClaim(poolId, claimId, shortfall)
+                // hook allows ONLY because pendingLiquidity > depositorLiquidity,
+                // and only up to the shortfall
       pay depositor the token value of the liquidity delivered
 ```
 
-**The hook's `settleClaim` verification:**
+> **Implementation note.** The shipped hook does not expose an external `settleClaim`. The only
+> writer of `pendingLiquidity` is `afterRemoveLiquidity`, which runs only after the PoolManager
+> has actually removed liquidity. `hookData` carries the claim id as a *correlation* channel; it
+> never authorises a removal. A vault cannot decrement the ledger by asserting that it did.
 
-```solidity
-function settleClaim(PoolId poolId, uint256 claimId, int128 liquidityRemoved)
-    external onlyVault(poolId) returns (bool)
-{
-    Claim storage c = claims[poolId][claimId];
-    require(c.status == Registered || c.status == PartiallySettled, "bad status");
-    require(liquidityRemoved > 0, "zero");
-    require(liquidityRemoved <= c.liquidityAmount - c.settledAmount, "over-claim");
-    // The shadow ledger must corroborate a real decrease in vault-side liquidity.
-    require(depositorLiquidity[poolId] + curatorLiquidity[poolId] <= snapshotTotal, "no removal");
-    c.settledAmount += uint128(liquidityRemoved);
-    pendingLiquidity[poolId] -= liquidityRemoved;
-    ...
-}
-```
-
-> The corroboration check needs a per-claim snapshot of total vault-side liquidity taken at
-> `registerClaim` time. Store it on the `Claim` struct: `uint128 totalLiquidityAtRegistration`.
-> Then settlement requires `currentTotal <= totalLiquidityAtRegistration - liquidityRemoved`.
-> This makes the decrement unforgeable even against a compromised vault.
+**Why the ledger cannot be forged:** the hook takes a snapshot of total vault-side liquidity at
+registration, then requires the observed removal to be no larger than the claim's remaining
+liquidity. The decrement is bounded and derived from pool state, so it survives a compromised
+vault.
 
 ### 6.4 Curator exit
 
@@ -298,7 +287,7 @@ curator → vault.requestCuratorExit()
           curatorExitApproved[poolId] = true
   vault → poolManager.unlock:
     vault → poolManager.modifyLiquidity(CURATOR_SALT, -delta)   // hook re-checks the gate
-    vault → poolManager.take(usdc, curator, proceeds - nettedShortfall)
+    vault → poolManager.take(usdc, curator, proceeds)
 ```
 
 The hook's `beforeRemoveLiquidity` for curator-salt removals:
@@ -458,7 +447,7 @@ Phase 3  SkylineVault: deposit, shares, claim queue, settlement
    │
 Phase 4  exit gate: approveCuratorExit, revocation, last-resort exception
    │
-Phase 5  loss absorption: shortfall → bond
+Phase 5  last-resort bond drawdown: shortfall → depositor
    │
 Phase 6  mandate enforcement: fee cap, tick band, minimum skin
    │
@@ -525,7 +514,7 @@ using StateLibrary for IPoolManager;
 
 | Deviation | Reason | Documented risk |
 |---|---|---|
-| Vault custodies the curator's bond position | The vault must be able to force absorption without curator cooperation | `R-02` — mitigated by the curator's balance being independently derivable from pool state |
+| Vault custodies the curator's bond position | The vault must be able to force a bounded bond drawdown without curator cooperation | `R-02` — mitigated by the curator's balance being independently derivable from pool state |
 | Curator exit uses an approval + ledger-empty gate rather than a pure queue | Simpler, and provably equivalent in the observable cases | `R-04` |
 | No oracle in the exit path | Safety | Deliberate |
 | Single pool per vault | 17-day build window | `R-07` — multi-pool is explicitly out of scope |

@@ -16,7 +16,7 @@
 - [ ] The curator's exit attempt reverts with `CuratorExitBlocked` — with the **expected** pending
       value
 - [ ] A depositor exit completes successfully (proving liveness on the live deployment)
-- [ ] The bond absorbs a shortfall correctly on a second seeded deployment
+- [ ] The bond supplies a bounded last-resort shortfall correctly on a second seeded deployment
 
 ---
 

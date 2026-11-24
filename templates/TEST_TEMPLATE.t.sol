@@ -107,6 +107,6 @@ contract <Subject>Test is Test {
         // Expect: pendingLiquidity == 0, Alice paid
 
         // Step 4 — the shortfall case
-        // Expect: 10_000 absorbed by the curator bond
+        // Expect: 10_000 supplied by the curator bond in the last-resort branch
     }
 }

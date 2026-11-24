@@ -89,8 +89,8 @@ export function AboutSection() {
                 <div className="mt-3 space-y-2">
                   <Row left="Depositor exit" right="symmetric redeem" />
                   <Row left="Curator exit" right="symmetric redeem" />
+                  <Row left="Curator exit while claims are open" right="allowed" muted />
                   <Row left="Priority" right="none" muted />
-                  <Row left="Who absorbs the loss" right="whoever is left" muted />
                 </div>
               </div>
 
@@ -101,11 +101,16 @@ export function AboutSection() {
                 <div className="mt-3 space-y-2">
                   <Row left="Depositor exit" right="always permitted" good />
                   <Row left="Curator exit" right="junior to claims" good />
+                  <Row left="Curator exit while claims are open" right="blocked in the hook" good />
                   <Row left="Priority" right="enforced in the hook" good />
-                  <Row left="Who absorbs the loss" right="the curator's bond" good />
                 </div>
               </div>
             </div>
+
+            <p className="mt-6 text-sm leading-relaxed text-slate-600">
+              A market loss is borne by the shares that held it; the curator is not slashed because
+              the pool moved. Locking is not slashing.
+            </p>
 
             <p className="mt-6 text-sm leading-relaxed text-slate-600">
               Withdrawal queues solve timing for depositors. They say nothing about the

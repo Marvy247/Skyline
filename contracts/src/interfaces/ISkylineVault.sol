@@ -24,10 +24,12 @@ interface ISkylineVault {
     /// @notice The curator's bonded liquidity, recomputed from pool state.
     function curatorBondValueFromPool() external view returns (uint256);
 
-    /// @notice The curator's net exit proceeds right now.
+    /// @notice The curator's exit proceeds right now: the live value of the bonded position.
     function curatorExitProceeds() external view returns (uint256);
 
-    /// @notice Uncovered claim amount charged to the curator.
+    /// @notice Bond value already delivered to depositors in the last-resort path.
+    /// @dev This is a historical accountability counter, not a live deduction. The value left the
+    ///      curator's position when it was removed, so it is not netted from exit proceeds again.
     function uncoveredShortfall() external view returns (uint256);
 
     /// @notice The curator's skin as a share of total vault liquidity, in bps.
