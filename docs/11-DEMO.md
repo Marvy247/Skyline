@@ -359,8 +359,15 @@ cast call $V 'balanceOf(address)(uint256)' 0xc96d811952e6f87EFd0ddEDa3b85fe30F76
 
 **Retakes.** Each settlement permanently serves `2.5` of the demo wallet's `5.0` shares and
 removes the matching assets from the pool. The demo wallet supports **one clean take, then one
-more**; after that it has no shares. If you need a third take, transfer shares from the curator
-(`0x27A2…`, holds `3.066599`) or redeploy. Rehearse the clicks on a fork before the live take.
+more**; after that it has no shares. If you need a third take, transfer shares from the deployer
+(`0x27A2…`, holds `3.066599`) or redeploy.
+
+There is a second limit: a **successful** `requestCuratorExit` starts the vault's 1-hour
+`CURATOR_EXIT_COOLDOWN`. On a retake inside that hour, the blocked attempt reverts `CoolingOff`
+*before* it reaches the hook, so the decoded error is not `CuratorExitBlocked`. Rehearse on a
+fork, and for a live retake either wait an hour, stop the take after settlement (never grant the
+final approval), or record the success beat on the fork. The first take is unaffected: the
+blocked attempt reverts atomically and does not start the cooldown.
 
 Start the dashboard with the production build so the live env is baked in:
 
