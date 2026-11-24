@@ -7,21 +7,21 @@
 
 ## 1. Test matrix
 
-| Suite | Type | Purpose | Target |
+**Shipped suite: 67 tests — 39 core unit + 21 Chainlink/keeper + 7 invariants.**
+
+| Suite | Tests | Type | Covers |
 |---|---|---|---|
-| `test/Primitives.t.sol` | unit | v4 mechanics: salt separation, owner-only modification, `StateLibrary` reads | 100% of Phase 0 assertions |
-| `test/HookShadow.t.sol` | unit | Shadow-ledger correctness | all branches |
-| `test/ClaimLedger.t.sol` | unit | Claim register/settle/expire, all revert paths | all branches |
-| `test/Vault.t.sol` | unit + fuzz | ERC-4626 maths, NAV, share inflation | fuzz 10k runs |
-| `test/ExitLadder.t.sol` | unit | The worked example, asserted number by number | exact values |
-| `test/Mandate.t.sol` | unit | Every mandate constraint and its revert | all branches |
-| `test/Fee.t.sol` | unit + invariant | HWM performance fee | invariant |
-| `test/Oracle.t.sol` | fuzz | Oracle failure modes | fuzz 10k runs |
-| `test/invariant/Cep.t.sol` | **invariant** | INV-2, INV-3, INV-8 | ≥ 10,000 runs, ≥ 500 calls |
-| `test/invariant/NoLockout.t.sol` | **invariant** | INV-6 | ≥ 10,000 runs |
-| `test/invariant/Ledger.t.sol` | **invariant** | INV-1, INV-2, INV-4, INV-11 | ≥ 10,000 runs |
-| `test/invariant/Skin.t.sol` | **invariant** | INV-7, INV-9, INV-13 | ≥ 10,000 runs |
-| `test/fork/BaseSepolia.t.sol` | fork | Live PoolManager integration | all critical paths |
+| `test/unit/Primitives.t.sol` | 8 | unit | v4 mechanics: position keying, salt separation, owner-only modification, shadow-counter accuracy, deposit pricing |
+| `test/unit/ClaimLedger.t.sol` | 17 | unit | The ledger: register/settle/expire, both sides of the exit gate, approval revocation, claim limits |
+| `test/unit/ExitLadder.t.sol` | 8 | unit | The worked example and the exit ladder: depositor-first settlement, market-loss semantics, liveness |
+| `test/unit/ClaimAccounting.t.sol` | 4 | unit | Share reservation, full settlement with burns, expiry, permissionless cancel |
+| `test/unit/Counterfactual.t.sol` | 2 | unit | With-CEP vs without-CEP ordering — the load-bearing proof |
+| `test/Oracle.t.sol` | 21 | unit | Chainlink risk regime: every feed failure mode, HWM ratchet, breach confirmation, keeper, fuzzed INV-5 |
+| `test/invariant/Cep.t.sol` | 7 invariants | **invariant** | INV-1 … INV-6 plus shadow-counter and over-settlement checks; 2,000 runs × 100,000 calls |
+| `test/utils/SkylineFixture.sol` | — | harness | Deploys PoolManager, tokens, hook on a permission-correct address, pool and vault; seeds the bootstrap position |
+
+There is **no automated fork test** in the 67; the final build was instead rehearsed end-to-end
+against a live Base Sepolia fork (§5).
 
 ---
 
@@ -211,21 +211,24 @@ function invariant_depositorNeverStuck() public {
 
 ---
 
-## 5. Fork tests
+## 5. Fork rehearsal
 
-Against a live testnet PoolManager (Base Sepolia):
+The shipped suite has **no automated fork test**, and the 67-test count does not include one.
+Instead, the final build was deployed to Base Sepolia and its whole demo path was rehearsed
+end-to-end against a fork of the canonical v4 PoolManager, with the same deployer, nonce, salt
+and code. That rehearsal covered:
 
-| Test | Purpose |
+| Surface | What it proved |
 |---|---|
-| `test_fork_depositAndWithdraw` | Real pool, real hook, full round trip |
-| `test_fork_twoSalts` | Two positions in the same range with different salts, real fee accounting |
-| `test_fork_hookSeesSenderAndSalt` | Log the callback arguments in a live pool |
-| `test_fork_stateLibraryReads` | Confirm `getPositionInfo` returns what we expect on a live pool |
-| `test_fork_curatorBlocked` | Live revert with `CuratorExitBlocked` |
-| `test_fork_settlement` | Live settlement paying out real tokens |
+| Deploy + seed | Real USDC/WETH, canonical PoolManager, live Chainlink ETH/USD feed |
+| Two-salt positions | Depositor and curator liquidity coexist in one pool with separate salts |
+| `CuratorExitBlocked` | The live hook reverts with the exact pending obligation |
+| Settlement | Claims pay from depositor liquidity and clear the hook's ledger |
+| Curator exit | The same request succeeds once the queue is empty |
 
-Fork tests are the **highest-value proof** for the demo: they show the mechanism on a real
-PoolManager, not a mock.
+The transcript, addresses and exact values are in `docs/15-PROGRESS.md` §13.1. A future
+`test/fork/BaseSepolia.t.sol` could promote this to CI; it is not shipped, and this document
+does not claim it as part of the suite.
 
 ---
 
@@ -257,7 +260,7 @@ forge build --sizes
 
 **Quality gates before the 30 Nov progress update:**
 
-- [ ] All suites green, including every invariant suite at ≥ 10,000 runs
+- [ ] All suites green; invariants at 2,000 runs by default and 10,000 in the CI profile
 - [ ] `forge fmt --check` clean
 - [ ] No compiler warnings
 - [ ] Coverage on `SkylineHook.sol` and `SkylineVault.sol` ≥ 90% line coverage, with every

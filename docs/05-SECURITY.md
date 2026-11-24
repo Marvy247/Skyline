@@ -234,7 +234,8 @@ Be precise and honest. Say exactly this:
 
 - Contracts are **unaudited**.
 - We have run a **formal invariant suite** covering the six headline invariants, under fuzzing
-  and a stateful handler, plus a fork test against a live testnet PoolManager.
+  and a stateful handler, plus a manual end-to-end rehearsal against a fork of the live testnet
+  PoolManager. There is no automated fork test, and we do not count one.
 - The design's security argument rests on **a small number of checkable invariants**, listed in
   this document, not on prose.
 - The mechanism is **not custodial in the sense that matters**: depositor and curator balances
